@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Jet's Wiki</title>
+  <style>
+    :root { --bg: #fafaf9; --fg: #1c1917; --muted: #57534e; --accent: #2563eb; --card: #ffffff; --border: #e7e5e4; }
+    @media (prefers-color-scheme: dark) {
+      :root { --bg: #1c1917; --fg: #f5f5f4; --muted: #a8a29e; --accent: #60a5fa; --card: #292524; --border: #44403c; }
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--fg); line-height: 1.6; }
+    header, main, footer { max-width: 760px; margin: 0 auto; padding: 0 16px; }
+    header { padding-top: 48px; }
+    h1 { margin: 0 0 4px; font-size: 2.25rem; }
+    .tagline { color: var(--muted); margin: 0 0 32px; }
+    nav { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 32px; border-bottom: 1px solid var(--border); padding-bottom: 12px; }
+    nav a { color: var(--accent); text-decoration: none; }
+    section { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 20px 24px; margin-bottom: 20px; }
+    h2 { margin-top: 0; font-size: 1.3rem; }
+    footer { color: var(--muted); font-size: 0.9rem; padding-bottom: 48px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Jet's Wiki</h1>
+    <p class="tagline">A placeholder home for notes, guides, and ideas.</p>
+    <nav>
+      <a href="#about">About</a>
+      <a href="#getting-started">Getting Started</a>
+      <a href="#topics">Topics</a>
+    </nav>
+  </header>
+  <main>
+    <section id="about">
+      <h2>About</h2>
+      <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris.</p>
+    </section>
+    <section id="getting-started">
+      <h2>Getting Started</h2>
+      <p>Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident.</p>
+    </section>
+    <section id="topics">
+      <h2>Topics</h2>
+      <ul>
+        <li>Placeholder topic one</li>
+        <li>Placeholder topic two</li>
+        <li>Placeholder topic three</li>
+      </ul>
+    </section>
+  </main>
+  <footer>Placeholder content &middot; Coming soon</footer>
+</body>
+</html>
