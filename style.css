@@ -1,0 +1,170 @@
+/* Autumn / Halloween theme for Jet's Wiki */
+:root {
+  --bg: #fbf3e6;
+  --bg-deep: #f3e2c7;
+  --fg: #2b1a10;
+  --muted: #6b4a33;
+  --accent: #c2410c;
+  --accent-2: #7c3aed;
+  --card: #fffaf2;
+  --border: #e6c9a0;
+  --shadow: 0 2px 0 rgba(120, 60, 20, 0.12);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #140d1c;
+    --bg-deep: #1f1430;
+    --fg: #f6e9d7;
+    --muted: #c9b29a;
+    --accent: #fb923c;
+    --accent-2: #a78bfa;
+    --card: #221733;
+    --border: #3f2a55;
+    --shadow: 0 2px 0 rgba(0, 0, 0, 0.4);
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: "Nunito", system-ui, -apple-system, sans-serif;
+  background:
+    radial-gradient(ellipse at top, var(--bg-deep), transparent 60%),
+    var(--bg);
+  background-attachment: fixed;
+  color: var(--fg);
+  line-height: 1.65;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+header, main, footer {
+  position: relative;
+  z-index: 1;
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 0 16px;
+}
+
+header { padding-top: 56px; text-align: center; }
+
+.moon {
+  width: 72px;
+  height: 72px;
+  margin: 0 auto 12px;
+  display: block;
+}
+
+h1, h2 {
+  font-family: "Creepster", "Nunito", cursive;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+}
+
+h1 {
+  margin: 0 0 4px;
+  font-size: clamp(2.6rem, 9vw, 4rem);
+  color: var(--accent);
+  text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.15);
+}
+
+h2 {
+  margin: 0 0 8px;
+  font-size: 1.7rem;
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.tagline { color: var(--muted); margin: 0 0 28px; font-style: italic; }
+
+nav {
+  display: flex;
+  justify-content: center;
+  gap: 8px 20px;
+  flex-wrap: wrap;
+  margin-bottom: 36px;
+  padding-bottom: 14px;
+  border-bottom: 2px dashed var(--border);
+}
+
+nav a {
+  color: var(--accent-2);
+  text-decoration: none;
+  font-weight: 700;
+}
+nav a:hover { color: var(--accent); }
+
+section {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 22px 24px;
+  margin-bottom: 22px;
+  box-shadow: var(--shadow);
+}
+
+section ul { padding-left: 0; list-style: none; margin: 0; }
+section li { padding: 4px 0; }
+section li::before { content: "🍂"; margin-right: 10px; }
+
+footer {
+  color: var(--muted);
+  font-size: 0.9rem;
+  text-align: center;
+  padding: 16px 16px 56px;
+}
+
+/* Falling leaves */
+.leaves {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+}
+.leaves span {
+  position: absolute;
+  top: -40px;
+  font-size: 22px;
+  opacity: 0.75;
+  animation: fall linear infinite;
+}
+.leaves span:nth-child(1) { left: 5%;  animation-duration: 14s; animation-delay: 0s; }
+.leaves span:nth-child(2) { left: 18%; animation-duration: 18s; animation-delay: 4s; font-size: 18px; }
+.leaves span:nth-child(3) { left: 33%; animation-duration: 16s; animation-delay: 8s; }
+.leaves span:nth-child(4) { left: 52%; animation-duration: 20s; animation-delay: 2s; font-size: 26px; }
+.leaves span:nth-child(5) { left: 68%; animation-duration: 15s; animation-delay: 6s; }
+.leaves span:nth-child(6) { left: 82%; animation-duration: 19s; animation-delay: 10s; font-size: 18px; }
+.leaves span:nth-child(7) { left: 93%; animation-duration: 17s; animation-delay: 3s; }
+
+@keyframes fall {
+  0%   { transform: translate(0, 0) rotate(0deg); }
+  50%  { transform: translate(40px, 55vh) rotate(180deg); }
+  100% { transform: translate(-20px, 110vh) rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .leaves { display: none; }
+}
+
+/* 404 page */
+.lost {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  padding: 0 16px;
+}
+.lost .ghost { font-size: 72px; animation: float 3s ease-in-out infinite; }
+.lost a { color: var(--accent-2); font-weight: 700; }
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-12px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lost .ghost { animation: none; }
+}
