@@ -168,3 +168,38 @@ footer {
 @media (prefers-reduced-motion: reduce) {
   .lost .ghost { animation: none; }
 }
+
+/* Article pages */
+.crumbs { margin: 0 0 8px; font-size: 0.9rem; color: var(--muted); }
+.crumbs a, footer a { color: var(--accent-2); text-decoration: none; font-weight: 700; }
+.page-title { font-size: clamp(2rem, 7vw, 3rem); }
+.article h3 { margin: 24px 0 8px; font-size: 1.15rem; color: var(--accent-2); }
+.article p { margin: 0 0 14px; }
+.article a { color: var(--accent-2); }
+.article a.fn { text-decoration: none; font-size: 0.8em; vertical-align: super; }
+.article ol.beats, .article ol.sources, .article ul.plain { padding-left: 22px; margin: 0 0 14px; list-style: revert; }
+.article ol.beats li::before, .article ol.sources li::before, .article ul.plain li::before { content: none; }
+.article ol.sources li { margin-bottom: 8px; font-size: 0.95rem; }
+.article ol.sources li:target { background: color-mix(in srgb, var(--accent) 15%, transparent); border-radius: 6px; }
+code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.88em; background: var(--bg-deep); padding: 1px 5px; border-radius: 4px; }
+pre { background: var(--bg-deep); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; overflow-x: auto; margin: 0 0 14px; }
+pre code { background: none; padding: 0; font-size: 0.85rem; line-height: 1.5; }
+.table-wrap { overflow-x: auto; margin: 0 0 16px; }
+table { width: 100%; border-collapse: collapse; font-size: 0.93rem; }
+th, td { text-align: left; vertical-align: top; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+th { color: var(--accent); font-weight: 700; }
+.questions td:last-child { white-space: nowrap; }
+.decision { margin: 6px 0 0 !important; color: var(--muted); font-size: 0.9rem; }
+.pill { display: inline-block; padding: 1px 10px; border-radius: 999px; font-size: 0.8rem; font-weight: 700; }
+.pill.open { background: color-mix(in srgb, var(--accent) 20%, transparent); color: var(--accent); }
+.pill.done { background: color-mix(in srgb, var(--accent-2) 20%, transparent); color: var(--accent-2); }
+.layers { display: flex; flex-direction: column; align-items: center; gap: 4px; margin: 8px 0 18px; }
+.layers > div:not(.arrow) { width: min(280px, 100%); text-align: center; border: 1px solid var(--border); background: var(--bg-deep); border-radius: 10px; padding: 8px 12px; }
+.layers span { display: block; color: var(--muted); font-size: 0.9rem; }
+.layers .arrow { color: var(--accent); font-size: 1.2rem; line-height: 1; }
+section li.link::before { content: "🛸"; }
+section li a { color: var(--accent-2); font-weight: 700; }
+@media (max-width: 520px) {
+  section { padding: 18px 14px; }
+  th, td { padding: 8px 6px; }
+}

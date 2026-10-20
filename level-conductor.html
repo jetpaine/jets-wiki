@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Level Conductor · Jet's Wiki</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Creepster&family=Nunito:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="leaves" aria-hidden="true">
+    <span>🍂</span><span>🍁</span><span>🍂</span><span>🦇</span><span>🍁</span><span>🍂</span><span>🍁</span>
+  </div>
+
+  <header>
+    <p class="crumbs"><a href="./">Jet's Wiki</a> / Defender X</p>
+    <h1 class="page-title">Level Conductor: Research</h1>
+    <p class="tagline">Defender X &middot; Jesse Paine &middot; 17 Oct 2026</p>
+    <nav>
+      <a href="#why">Why a conductor</a>
+      <a href="#l4d">Left 4 Dead's Director</a>
+      <a href="#scripting">Level scripting</a>
+      <a href="#fit">How they fit</a>
+      <a href="#defender-x">For Defender X</a>
+      <a href="#sources">Sources</a>
+    </nav>
+  </header>
+
+  <main class="article">
+    <section id="why">
+      <h2>Why a conductor</h2>
+      <p>The Level Conductor is a working name for a "meta AI" that watches a level as it plays and changes its key events, or invents new ones, so each run feels shot like a film. It serves the first pillar: Newtonian wherever possible, cinematic when there can be no compromise.</p>
+      <p>This is a living research doc, not a design. It collects how Left 4 Dead's AI Director worked, how levels are usually scripted, and how the two fit, so we have shared vocabulary before deciding anything. Technical detail sits in footnotes.</p>
+    </section>
+
+    <section id="l4d">
+      <h2>How Left 4 Dead's Director worked</h2>
+      <p>The Director controls pacing, not difficulty. Booth's words: it changes the frequency of threats, never their amplitude. It came from watching Counter-Strike, where long quiet stretches are broken by sudden, intense fights. Constant combat is tiring, and long inactivity is boring. <a class="fn" href="#src-1">[1]</a></p>
+      <p><strong>It reads the players.</strong> Each survivor has one "intensity" number. It rises when they take damage, go down, get pulled off a ledge, or see an infected die close by. It decays toward zero over time, but not while they're still under attack. The Director watches the highest of the four. Booth called the estimate "crude, yet the resulting pacing works." <a class="fn" href="#src-1">[1]</a></p>
+      <p><strong>It runs a four-beat rhythm on that number:</strong></p>
+      <ol class="beats">
+        <li><strong>Build up:</strong> full threats (wanderers, mobs, specials) until intensity crosses a peak threshold.</li>
+        <li><strong>Sustain peak:</strong> keep the full threats for 3–5 more seconds.</li>
+        <li><strong>Peak fade:</strong> stop adding threats and let the current fight play out until intensity drops.</li>
+        <li><strong>Relax:</strong> almost no threats for 30–45 seconds, or until the team has moved far enough toward the next safe room. Then back to build up.</li>
+      </ol>
+      <p><strong>Bosses sit outside the rhythm.</strong> Tanks and Witches are dealt along the route at map start, shuffled with "nothing" and never the same twice in a row. They are meant to break the pacing, so the Director doesn't hold them back during a relax.</p>
+      <p><strong>It only works near the players.</strong> Enemies spawn and despawn in the area around the team, out of sight. About 75% of mobs come from behind, since what's ahead gets met anyway. Booth calls the overall approach "structured unpredictability": neither purely random nor uniform, with designers setting how much each thing varies. <a class="fn" href="#src-2">[2]</a></p>
+      <p><strong>Designers place the options; the Director picks which ones exist.</strong> Level designers put many possible weapon caches and item spots in each map, and the Director chooses which appear each run. The placement stays hand-made (a rifle in a gun rack tells a story), but the run still varies.</p>
+      <p><strong>Left 4 Dead 2 gave it more verbs.</strong> It could change weather (sudden storms that cut visibility and drown out voice chat), and on some maps it rearranged paths, like a cemetery whose route differs each time. <a class="fn" href="#src-3">[3]</a> Designers also gained <strong>director scripts</strong>: a level can override the Director's settings for one stretch, turning it into a scripted panic event, a gauntlet or a finale. Only one runs at a time. <a class="fn" href="#src-4">[4]</a></p>
+    </section>
+
+    <section id="scripting">
+      <h2>How levels are usually scripted</h2>
+      <p>Most shipped levels are scripted by hand, out of the same small kit: when something happens, do something. Engines differ in how it's written, but the shape is shared.</p>
+      <p><strong>Triggers and events.</strong> A trigger is a condition: the player enters a volume, a timer runs out, a target dies. It fires actions: spawn a squad, open a door, play a line. Good practice keeps the cause apart from the effect, so pieces can be reused and rewired (Source's entity inputs and outputs, Unreal's Blueprints, Doom 3's per-map scripts). <a class="fn" href="#src-5">[5]</a></p>
+      <p><strong>Scripted sequences.</strong> Set pieces are written beat by beat: the bridge collapses, the dropship arrives. They give the most control and break most easily, because the player can be in the wrong place or kill the wrong thing. Designers protect them by gating (a door closes behind you) and by giving each beat a fallback.</p>
+      <p><strong>Encounter scripting: the designer sets goals, the AI decides how.</strong> Bungie split Halo's combat into two scopes: code owns the 30-second scope (good decisions, instant reactions), design owns the 3-minute scope (strategic purpose, battle flow). Designers drew battle lines, territory to hold and retreat conditions; the AI fought inside them. <a class="fn" href="#src-6">[6]</a> In Halo 3 this became a priority-ordered list of tasks. Squads claim the highest open task and fall back down the list as tasks finish, so the designer writes what the battle is about, not each move. <a class="fn" href="#src-7">[7]</a></p>
+      <p><strong>Pacing is usually planned on paper.</strong> Designers commonly sketch a level's intensity as a curve or beat chart before building, then place triggers to hit it. The curve is fixed; the player's actual experience of it varies.</p>
+      <p>Our M1 framework draft already follows this kit: phases, triggers, objectives, timers and waves, written in a Kotlin DSL.</p>
+      <p><strong>Under the hood, a level is data plus a runtime.</strong> The editor saves the level as a file of entities: each has a type, a position, settings, and connections to other entities. The engine loads that file, and a small runtime watches each trigger's condition and calls the connected actions when it fires. Designers fill the file in through an editor, rarely by hand.</p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Engine</th><th>What designers fill in</th><th>What runs it</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Source (Half-Life 2, Left 4 Dead)</td><td>Entities with key-values and output strings in the map file, e.g. <code>OnStartTouch → bridge_door, Open, delay 2</code> <a class="fn" href="#src-10">[10]</a></td><td>The engine's entity input/output system</td></tr>
+            <tr><td>Left 4 Dead 2 director scripts</td><td>Squirrel script files that set a <code>DirectorOptions</code> table <a class="fn" href="#src-4">[4]</a></td><td>The VScript interpreter; the Director reads the table</td></tr>
+            <tr><td>Doom 3</td><td>Map entities plus a per-map <code>.script</code> file in a C-like language <a class="fn" href="#src-5">[5]</a></td><td>The engine's script virtual machine</td></tr>
+            <tr><td>Unreal</td><td>Blueprint node graphs saved inside the level asset</td><td>Compiled to bytecode, run by the Blueprint VM</td></tr>
+            <tr><td>Halo 3</td><td>Squads, zones and the task list set up in Bungie's tools, plus HaloScript for set pieces</td><td>The encounter system and script interpreter</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p><strong>Plain data rarely holds it all.</strong> JSON or YAML covers the what and where well. Branching logic ("if both turrets die before the timer, skip phase 3") pushes a format toward a node graph or a small script language. Most engines mix the two: data for placement and wiring, script for the odd cases.</p>
+      <p>A Defender X phase written as data might look like this (illustrative only, not a format proposal):</p>
+<pre><code>phase: hold_the_line
+limits:            # what a conductor may vary in this phase
+  waves: { min: 3, max: 5 }
+  wave_gap_s: [20, 45]
+triggers:
+  - when: { timer: jump_drive, below_s: 30 }
+    do:
+      - spawn: { squad: interceptors_heavy, from: behind_player, out_of_sight: true }
+      - radio: wingman_jump_soon
+  - when: { destroyed: [turret_a, turret_b] }
+    do:
+      - goto_phase: escort_out</code></pre>
+      <p>Our Kotlin DSL sits at the script end of this range: typed and checked when it compiles, but edited by people who write Kotlin.</p>
+    </section>
+
+    <section id="fit">
+      <h2>How the two fit together</h2>
+      <p>In every example we found, the director doesn't replace level scripting. It sits between the hand-written level and the actors, and fills in what the script leaves open.</p>
+      <p><strong>The designer writes the backbone and the options.</strong> Left 4 Dead's maps are fixed routes with safe rooms, hand-placed crescendo events and finales. The designer also places many possible item spots, spawn areas and boss slots, and the Director chooses among them at run time. Its job is to choose when and which, never what the level is about.</p>
+      <p><strong>The director reads the player and sets the timing.</strong> Its input is a rough model of how the player feels (Left 4 Dead's intensity), and its output is mostly "more now" or "back off". Booth's line: simple algorithms can produce compelling pacing.</p>
+      <p><strong>At the big moments, the script takes back control.</strong> A finale or gauntlet is a director script: the designer retunes the Director for that stretch rather than switching it off. Pacing still adapts, but inside limits the designer set for the set piece.</p>
+      <p><strong>The director knows everything; the actors don't.</strong> Alien: Isolation splits the work the same way. Its director always knows where the player is and tracks a "menace gauge". It nudges the alien toward the player, and sends it into the vents when menace stays high too long. The alien itself has to find the player with its own senses, so it can still be fooled. <a class="fn" href="#src-8">[8]</a> The result feels lucky, not rigged; the article calls it "psychopathic serendipity".</p>
+      <p><strong>The same pattern runs dialogue.</strong> Left 4 Dead 2's lines come from a database of rules matched against facts about the moment (who's hurt, where, what just happened). The most specific matching rule wins. Writers add special cases and running gags without new code. <a class="fn" href="#src-9">[9]</a></p>
+      <div class="layers" aria-label="Three layers: designer, conductor, actors">
+        <div><strong>Designer</strong><span>sets the goals</span></div>
+        <div class="arrow" aria-hidden="true">↓</div>
+        <div><strong>Conductor</strong><span>picks the beats</span></div>
+        <div class="arrow" aria-hidden="true">↓</div>
+        <div><strong>Actors</strong><span>play them out</span></div>
+      </div>
+      <p>Written as layers, it matches the three layers our enemy AI already has. The designer sets the goals, the conductor picks the beats, and the actors play them out. Information flows down.</p>
+    </section>
+
+    <section id="defender-x">
+      <h2>What it might mean for Defender X</h2>
+      <p>These are early observations to react to, not proposals.</p>
+      <p><strong>Our goal differs from Valve's.</strong> Left 4 Dead's Director exists for replay value in a co-op game. Ours is a single-player, story-first game, so the conductor's job may be less about variety and more about making the authored beats land: the last wave arriving as the jump timer runs low, or the race back to the carrier ending close.</p>
+      <p><strong>"Cinematic" asks for more than intensity.</strong> Booth paced the amount of threat. We may also want to pace how it looks: an enemy swooping across the nose, a shot just off the bow, a wingman's radio call at the right second, music and screen effects on the peak. Some of that already lives in the enemy AI; the conductor might decide when it gets to happen.</p>
+      <p><strong>We already measure a lot of the player.</strong> G-load and greyout, hull, enemies zeroed and their morale, kills, distance to the carrier, time left on a timer. Any of these could feed a Defender X version of "intensity".</p>
+      <p><strong>The pillars set limits.</strong> If cinematic only wins when Newtonian can't work, the conductor shouldn't visibly cheat physics. Agreed rule, borrowed from Left 4 Dead's out-of-sight spawning: what's on screen stays honest, and what's off screen is the conductor's. Anything that bends physics goes in the exceptions log.</p>
+      <p><strong>It may sit inside M1's phases.</strong> A mission phase could set the conductor's limits for that stretch, the way a director script does for a finale.</p>
+      <p><strong>Several Episode 1 levels already lean on one:</strong></p>
+      <ul class="plain">
+        <li><strong>Level 1, 5 and 10:</strong> waves until the jump. Pacing the waves against the timer is close to Left 4 Dead's cycle.</li>
+        <li><strong>Level 4:</strong> the race's rubber-banding rival is a small conductor already.</li>
+        <li><strong>Level 7:</strong> the stealth search is close to Alien: Isolation's director and menace gauge.</li>
+        <li><strong>Level 11:</strong> the phantom ship has to keep pace and taunt at the right moments.</li>
+      </ul>
+
+      <h3>Open questions</h3>
+      <div class="table-wrap">
+        <table class="questions">
+          <thead>
+            <tr><th>Question</th><th>Status</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Is the conductor one system, or a set of smaller directors (waves, radio chatter, music, effects)?</td><td><span class="pill open">Open</span></td></tr>
+            <tr><td>What is our "intensity": one number, or several (danger, spectacle, story progress)?</td><td><span class="pill open">Open</span></td></tr>
+            <tr><td>Should it adapt to skill as well as pacing, or never touch difficulty, as Booth insisted?<p class="decision">It adapts to skill. Like Level 4's rubber-banding rival, combat will keep fights always a little close.</p></td><td><span class="pill done">Decided</span></td></tr>
+            <tr><td>How much can it invent, versus only choosing among options the designer placed?<p class="decision">It leans heavily toward choosing from designed options, in keeping with the cinematic pillar.</p></td><td><span class="pill done">Decided</span></td></tr>
+            <tr><td>Can it direct cutscene-like moments in gameplay, such as Level 15's switch to cinema mode?<p class="decision">Mostly no. Moments like this belong to scene scripting; the conductor may share some of the work.</p></td><td><span class="pill done">Decided</span></td></tr>
+            <tr><td>Does the player ever notice it, and does that matter?<p class="decision">Subtle enough that a naive player won't notice; fine if experienced players do (as with Burnout 3's rubber-banding). Consideration: catch-up that erases a clean, hard-won lead at the last second can feel unfair, though some frustration and randomness is a valid part of the experience.</p></td><td><span class="pill done">Decided</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="sources">
+      <h2>Notes and sources</h2>
+      <ol class="sources">
+        <li id="src-1">Mike Booth (Valve), <a href="https://steamcdn-a.akamaihd.net/apps/valve/2009/ai_systems_of_l4d_mike_booth.pdf">The AI Systems of Left 4 Dead</a>, AIIDE 2009 keynote slides. The primary source for the Director's goals, intensity model, pacing cycle, boss dealing and item placement.</li>
+        <li id="src-2">Same slides, technical detail. Spawning is limited to the "Active Area Set", the navigation areas around the team, so a few reused entities can stand in for hundreds of infected. A "flow distance" along the escape route measures progress and decides where things spawn. Mobs arrive every 90–180 seconds on Normal and grow over that interval. A Boomer's vomit forces one early. Wanderers are cleared in Relax.</li>
+        <li id="src-3">Shacknews, <a href="https://www.shacknews.com/article/58999/left-4-dead-2-interview">Left 4 Dead 2 interview</a> with Chet Faliszek, 2009: weather and paths that change each run.</li>
+        <li id="src-4">Valve Developer Community, <a href="https://developer.valvesoftware.com/wiki/L4D2_Director_Scripts">L4D2 Director Scripts</a>. Technical detail: a script sets a table of Director options, such as mob spawn times and how far the team travels before a relax ends. Finales run as stages (panic, Tank, delay, scripted). Seen through search excerpts only; the wiki blocked a direct read.</li>
+        <li id="src-5">dhewm3 modwiki, <a href="https://modwiki.dhewm3.org/Level_scripting">Level scripting</a> (Doom 3's per-map scripts).</li>
+        <li id="src-6">Chris Butcher and Jaime Griesemer (Bungie), <a href="https://www.jmeiners.com/shamans/papers/ai/the_illusion_of_intelligence.pdf">The Illusion of Intelligence: The Integration of AI and Level Design in Halo</a>, GDC 2002.</li>
+        <li id="src-7">Game Developer, <a href="https://www.gamedeveloper.com/design/combat-evolved-the-encounter-design-of-halo-3">Combat Evolved: The Encounter Design of Halo 3</a>.</li>
+        <li id="src-8">Tommy Thompson, Game Developer, <a href="https://www.gamedeveloper.com/design/the-perfect-organism-the-ai-of-alien-isolation">The Perfect Organism: The AI of Alien: Isolation</a>.</li>
+        <li id="src-9">Elan Ruskin (Valve), <a href="https://www.gdcvault.com/play/1015528/AI-driven-Dynamic-Dialog-through">AI-driven Dynamic Dialog through Fuzzy Pattern Matching</a>, GDC 2012 (summarized from the abstract and write-ups; the slides weren't read).</li>
+        <li id="src-10">Valve Developer Community, <a href="https://developer.valvesoftware.com/wiki/Inputs_and_Outputs">Inputs and Outputs</a>: how Source entities wire a trigger's output to another entity's input, with a parameter and delay. The engine rows without a footnote are from general knowledge, not checked against a source.</li>
+      </ol>
+    </section>
+  </main>
+
+  <footer><a href="./">← Back to Jet's Wiki</a></footer>
+</body>
+</html>
