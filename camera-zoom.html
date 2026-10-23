@@ -1,0 +1,380 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Camera and Zoom · Jet's Wiki</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Creepster&family=Nunito:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="leaves" aria-hidden="true">
+    <span>🍂</span><span>🍁</span><span>🍂</span><span>🦇</span><span>🍁</span><span>🍂</span><span>🍁</span>
+  </div>
+
+  <header>
+    <p class="crumbs"><a href="./">Jet's Wiki</a> / Defender X</p>
+    <h1 class="page-title">Camera Movement and Zoom</h1>
+    <p class="tagline">Defender X &middot; Preliminary approach &middot; Draft for discussion, nothing built &middot; 23 Oct 2026 &middot; Code as of <code>main</code> c659227</p>
+    <nav>
+      <a href="#today">How it works today</a>
+      <a href="#coupling">What assumes a locked camera</a>
+      <a href="#decisions">Decisions</a>
+      <a href="#first-steps">First steps</a>
+      <a href="#questions">Open questions</a>
+    </nav>
+  </header>
+
+  <main class="article">
+    <section id="intro">
+      <p class="lede">Later we want a virtual camera that can <strong>move</strong> (no longer locked on the player) and <strong>zoom</strong>. Moving the camera changes the world-to-screen transform. Zooming changes macro-pixel rendering too, because something has to give: either the cells grow and shrink, or objects are drawn with more or fewer cells.</p>
+      <p>This doc covers how rendering works today, what assumes a fixed, player-locked camera, and the decisions to make early, before code starts depending on one answer.</p>
+      <figure class="pixel-fig">
+        <div class="panels" id="panels"></div>
+        <figcaption>One ship, sampled from the same high-resolution shape at a 2× zoom-in. A scales the cells. B1 keeps the cells and samples the 1× sprite, so art cells become blocks. B2 keeps the cells and re-imports the sprite at twice the cell count.</figcaption>
+      </figure>
+    </section>
+
+    <section id="today">
+      <h2>How it works today</h2>
+      <h3>World to screen: <code>util/ViewTransform</code></h3>
+      <p><code>ViewTransform</code> replaced the old <code>CoordinateTransformer</code>. It's built once per frame from the camera position, the world angle and a screen anchor, and it does three things in order:</p>
+      <ol class="beats">
+        <li>translates the point relative to the camera,</li>
+        <li>rotates it by the world angle,</li>
+        <li>adds the screen anchor.</li>
+      </ol>
+      <p>It has <strong>no scale</strong>. One world unit is one virtual-canvas pixel (1920×1080, through a FitViewport). <code>ViewTransform.forPlayer</code> puts the camera on the player (<code>World.cameraX/Y</code> <em>is</em> <code>ship.physics.x/y</code>), takes the world angle from the player's angle, and puts the anchor at the play-area center plus <code>PLAYER_SCREEN_OFFSET</code> (−600, 0). The camera shake is <code>shifted()</code>: the anchor moved by whole cells.</p>
+
+      <h3>Macro-pixels</h3>
+      <ul class="plain">
+        <li><code>MACRO_PIXEL_SIZE</code> (4.5) is one cell, in virtual pixels.</li>
+        <li><code>MacroPixelRenderer</code> draws a sprite by inverse mapping. It walks the screen-aligned cells under the sprite's rotated bounds, snapped to a grid anchored at the canvas origin. Each cell takes the sprite cell under its center (nearest sampling). In other words, <strong>the screen grid is fixed and sprites are resampled onto it.</strong></li>
+        <li>Ship sprites are imported from 1024² art at a set length in cells (<code>PLAYER/ENEMY_SPRITE_LENGTH_PX</code> = 40) by <code>SpriteImport</code>. Rocks are generated placeholders.</li>
+        <li>Several things are screen-sized cell grids, all with the same fixed cell size and anchored at the canvas origin:
+          <ul class="plain">
+            <li><code>VaporGrid</code> (vapor trails, plus a second one for smoke)</li>
+            <li><code>CellBackground</code> (stars and nebula)</li>
+            <li><code>GlowLayer</code> (the glow and shimmer masks)</li>
+            <li><code>ScreenEffects.CellGrid.gameplay()</code> (cell bloom and the cell grade)</li>
+            <li><code>ShimmerEffect</code>'s <code>u_cell</code></li>
+          </ul>
+        </li>
+        <li>Effects, muzzle flash, engine flame, RCS jets and bullet streaks are measured in cells (dozens of <code>*_CELLS</code> settings) and snapped to the grid (<code>snapToCell</code>).</li>
+      </ul>
+
+      <h3>The cinematics already zoom</h3>
+      <p><code>ClipRenderer</code> and <code>DocCamera</code> zoom, pan and roll footage over a <strong>fixed</strong> 9 px cell grid. Each cell samples the frame pixel under its center, the same rule as <code>MacroPixelRenderer</code>. Zoom is clamped to 1.0–2.0. At 1.0, one footage pixel fills one cell. Above it, footage pixels become blocks of cells. Below it would lose detail, which is why the rig can't zoom out past 1:1 (issue #17). This is the precedent closest to the gameplay question.</p>
+    </section>
+
+    <section id="coupling">
+      <h2>What assumes the camera is locked on the player and doesn't zoom</h2>
+
+      <h3>The player is assumed to sit at the screen anchor</h3>
+      <ul class="plain">
+        <li><code>WorldRenderer.drawHulls</code> draws the player at <code>view.screenCenterX/Y</code>, not through <code>worldToScreen</code>.</li>
+        <li><code>drawShimmerLines</code> puts the player's hull cells at the anchor too.</li>
+        <li><code>placeBackground</code> centers the stars and nebula on the anchor.</li>
+        <li><code>OffScreenIndicatorRenderer</code> measures range from <code>view.cameraX/Y</code> (today the same as the player). It also aims the indicator from the anchor to the enemy, so with a moved camera the arrows would point from the wrong place.</li>
+        <li>The view's rotation pivot is the camera, which today is the player.</li>
+      </ul>
+
+      <h3>The view only rotates, it doesn't scale</h3>
+      <ul class="plain">
+        <li><code>directionToScreen</code> and the "unit length: no zoom" comments in <code>drawEngineFlame</code>, <code>drawJet</code> and <code>EffectRenderer</code> (muzzle) use a world direction as a screen direction of the same length.</li>
+        <li><code>SpeckField.render</code> repeats the transform's math inline, so it would skip any scale added to <code>ViewTransform</code>.</li>
+        <li><code>VaporGrid.begin</code> and <code>EffectRenderer</code> cull by screen size in world units. That's only equal while 1 unit = 1 px.</li>
+      </ul>
+
+      <h3><code>MACRO_PIXEL_SIZE</code> is used as a world length</h3>
+      <p>This is the biggest coupling. The same constant is the screen cell size and the world size of a sprite cell:</p>
+      <ul class="plain">
+        <li><code>Pose.cell</code>: where every hull cell is in the world, for hits, fires and hull pieces</li>
+        <li>hull and bounding radii in <code>CollisionSystem</code>, <code>ProjectileSystem</code>, <code>Obstacle</code>, <code>WorldSnapshot</code> (AI sensing) and <code>World</code> (near misses)</li>
+        <li><code>Effects.ignite</code> (the one-cell fire spacing), <code>VaporTrail</code> (puff spacing, flame tip) and <code>PhysicsState</code></li>
+      </ul>
+      <p>If zoom changes the screen cell, none of these may change with it, or gameplay would change with the zoom.</p>
+
+      <h3>Gameplay reads the view</h3>
+      <p><code>World.processProjectileHits</code> builds its own <code>ViewTransform.forPlayer</code> for the cinematic rule "hits happen where the player sees them". Ships can only be hit inside <code>SHIP_HIT_ZONE_INSET</code> (150 px) of the play area, and rocks anywhere on screen. Near misses and shimmers are on-screen only as well. If this used the real camera, zooming out would make far-off ships hittable, and moving the camera would change who can be hit.</p>
+
+      <h3>Screen grids are made for one size</h3>
+      <p><code>VaporGrid</code> and <code>CellBackground</code> reallocate (new arrays, a new Pixmap or Texture, or a new FrameBuffer) whenever the cell size changes. With cells that change size during a smooth zoom, that's a reallocation every frame.</p>
+    </section>
+
+    <section id="decisions">
+      <h2>Decisions to make early</h2>
+
+      <div class="dec">
+        <div class="did">D1</div>
+        <div>
+          <h3>What does zoom do to macro-pixels?</h3>
+          <span class="pill open">Leaning B · needs a look test</span>
+          <div class="opt">
+            <p><strong>A. Cells scale with zoom.</strong> The screen cell is <code>MACRO_PIXEL_SIZE × zoom</code>, and every object keeps its cell count. It looks like zooming into a finished 16-bit screen.</p>
+            <p>Pros:</p>
+            <ul class="plain">
+              <li>The art, effects and their <code>*_CELLS</code> settings stay as they are.</li>
+              <li>Simple to reason about. One way to build it: render the world at a fixed cell size into a buffer covering 1/zoom of the screen, then scale it up with hard edges, as <code>ClipRenderer</code> does.</li>
+            </ul>
+            <p>Cons:</p>
+            <ul class="plain">
+              <li>Cells come out uneven at non-integer zoom (4.5 px is already uneven on a 1080p display).</li>
+              <li>Smooth zoom makes the grid "breathe".</li>
+              <li>Zooming out shrinks cells below the chunky look. At 0.5 a cell is 2.25 px, so the 16-bit feel fades exactly when there's the most on screen.</li>
+              <li>The HUD's cell art (indicators, G-LIMIT) would no longer match the world's cells.</li>
+              <li>Every screen grid has to resize.</li>
+            </ul>
+          </div>
+          <div class="opt">
+            <p><strong>B. Cells stay fixed; objects get more or fewer cells.</strong> The screen grid never changes, and zoom changes how many cells an object covers. This is what the renderer already does for rotation, what the cinematics do, and what SNES Mode 7 does. There are two ways to fill the extra cells:</p>
+            <ul class="plain">
+              <li><strong>B1, sample.</strong> Pass a scale into <code>MacroPixelRenderer</code> and keep nearest sampling. Zoomed in, one art cell becomes a block of 2–3 screen cells, with the same stair-stepping as rotation. Zoomed out, art cells get skipped and thin details flicker.</li>
+              <li><strong>B2, re-import at the on-screen size.</strong> The ship source art is 1024², so <code>SpriteImport</code> can make a sprite at <code>lengthPx × zoom</code> cells, cached in steps (for example every 0.25 of zoom), giving real extra detail.
+                <ul class="plain">
+                  <li>Collisions keep using the 1× sprite, so physics doesn't depend on zoom.</li>
+                  <li>Damage marks, hull fires and broken-up hulls are kept per sprite cell today. They would need mapping from 1× cells to the detail sprite's cells.</li>
+                  <li>The art can pop when it switches between steps.</li>
+                  <li>Jesse may want hand-touched art at some steps.</li>
+                  <li>Rocks need real art or a generator that works at any size.</li>
+                </ul>
+              </li>
+            </ul>
+            <p>Under B, every <code>*_CELLS</code> setting has to say whether it's a <strong>world</strong> size (grows with zoom: hull fires, debris, a hit's flash on the ship) or a <strong>screen</strong> size (stays put: streak width, perhaps sparks). That's an audit of roughly 50 settings.</p>
+          </div>
+          <p>Leaning B. It's the rule the game and the cinematics already use (cells square and uniform to the screen, content resampled under them), and it keeps the look at every zoom. B1 is a cheap first step, and B2 can come later where detail matters. A look test should decide, the way the cinematics approach was decided.</p>
+        </div>
+      </div>
+
+      <div class="dec">
+        <div class="did">D2</div>
+        <div>
+          <h3>What is zoom for, and how far does it go?</h3>
+          <span class="pill done">Question for Jesse</span>
+          <p>The answer sets the range and how much D1 matters. Possible uses:</p>
+          <ul class="plain">
+            <li>cinematic in-engine moments (launch tube, carrier landing, the jump)</li>
+            <li>zooming out for situational awareness in a big dogfight</li>
+            <li>a punch-in on a kill</li>
+            <li>the debug view</li>
+          </ul>
+          <p>Is zoom continuous or in fixed steps? Does the player control it, or only scripts? Roughly what range? 0.5–2× behaves very differently from 0.25–4×.</p>
+        </div>
+      </div>
+
+      <div class="dec">
+        <div class="did">D3</div>
+        <div>
+          <h3>When the camera moves, does the ship stay the center of rotation?</h3>
+          <span class="pill done">Question for Jesse</span>
+          <p>The pillar is "ship fixed on screen, world rotates around the player". Moving the camera breaks the first half on purpose. Options:</p>
+          <ul class="plain">
+            <li>(a) The world still turns with the player's angle, pivoting on the player, while the camera only translates.</li>
+            <li>(b) The camera has its own angle, so a scripted shot can hold the carrier level while the player turns.</li>
+            <li>(c) Both, blended, so scripted shots can hand the angle back to the player smoothly.</li>
+          </ul>
+          <p>This decides whether <code>ViewTransform</code> stays "camera + angle + anchor" or becomes a full camera with its own pose. It also bears on scene player step 6, where <code>DocCamera</code> and <code>CameraRig</code> could become the in-game camera too.</p>
+        </div>
+      </div>
+
+      <div class="dec">
+        <div class="did">D4</div>
+        <div>
+          <h3>Is gameplay tied to the render camera or to a fixed gameplay frame?</h3>
+          <span class="pill open">Leaning gameplay frame</span>
+          <p>The hit zone, near misses and anything "on screen" today mean "visible in the player-locked 1× view". Options:</p>
+          <ul class="plain">
+            <li><strong>Gameplay frame.</strong> Gameplay keeps its own fixed view around the player (today's <code>forPlayer</code>), and the render camera is free.
+              <ul class="plain">
+                <li>Moves and zooms can never change the rules.</li>
+                <li>Zoom out, and you'd see bullets pass through ships in the outer ring.</li>
+                <li>Zoom in, and ships just off screen could still be hit.</li>
+              </ul>
+            </li>
+            <li><strong>Render camera.</strong> Rules follow what's actually visible. That's honest to the cinematic rule, but zoom becomes a gameplay setting.</li>
+          </ul>
+          <p>Leaning: a gameplay frame for now, plus a written exception for each rule that should follow what's visible.</p>
+        </div>
+      </div>
+
+      <div class="dec">
+        <div class="did">D5</div>
+        <div>
+          <h3>Separate world units from screen cells</h3>
+          <span class="pill open">Do first</span>
+          <p>Under any answer to D1, <code>MACRO_PIXEL_SIZE</code> has to split into two values:</p>
+          <ul class="plain">
+            <li><code>WORLD_CELL</code>: world units per sprite cell, a fixed part of physics</li>
+            <li>the screen cell: virtual px per cell, fixed under B and scaled under A</li>
+          </ul>
+          <p>Today they're both 4.5 and nothing visible changes. Doing this before zoom work stops new code from mixing them up.</p>
+        </div>
+      </div>
+
+      <div class="dec">
+        <div class="did">D6</div>
+        <div>
+          <h3>Snap the camera to the cell grid?</h3>
+          <span class="pill done">Needs a look test</span>
+          <p>The grid is anchored to the screen. A camera moving by fractions of a cell makes every object cross cell lines at slightly different moments, so the world shimmers, and objects that move with the camera jitter by a cell. The shake already moves in whole cells. Options:</p>
+          <ul class="plain">
+            <li>snap camera translation (after rotation, in screen space) to whole cells</li>
+            <li>allow sub-cell movement only during fast moves</li>
+            <li>accept the shimmer</li>
+          </ul>
+          <p>Under A, the same question applies to the zoom level.</p>
+        </div>
+      </div>
+
+      <div class="dec">
+        <div class="did">D7</div>
+        <div>
+          <h3>Background, specks and parallax under zoom</h3>
+          <ul class="plain">
+            <li>Stars and the nebula are "too distant to move". They probably shouldn't zoom either, or should zoom only a little.</li>
+            <li>Specks have per-layer parallax, so zoom should be parallax-scaled too.</li>
+            <li>The nebula is drawn at 1.5× the play area, so zooming out past about 0.67 shows its edges. It needs a bigger image or tiling.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="dec">
+        <div class="did">D8</div>
+        <div>
+          <h3>HUD and indicators</h3>
+          <ul class="plain">
+            <li>The HUD stays on the steady, unzoomed view, as it does with the shake today.</li>
+            <li>An indicator's "off screen" should follow the render camera, but its range should be measured from the player, not the camera.</li>
+            <li>At extreme zoom out, indicators may be hidden.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="dec">
+        <div class="did">D9</div>
+        <div>
+          <h3>Performance budget</h3>
+          <ul class="plain">
+            <li><code>MacroPixelRenderer</code> issues one <code>ShapeRenderer.rect</code> per cell.
+              <ul class="plain">
+                <li>Under B2 zoomed in, a 40-cell ship at 3× is about 120×120, roughly 14k rects per ship.</li>
+                <li>Under B zoomed out, there are fewer cells per ship but more ships, trails and effects on screen.</li>
+              </ul>
+            </li>
+            <li>The screen grids need allocating once at their largest size, not per frame.</li>
+            <li>Benchmark zoom the way the effects were (3584×1982, a <code>-PfxBench</code>-style option).</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="dec">
+        <div class="did">D10</div>
+        <div>
+          <h3>Precision</h3>
+          <p>Issue #32 showed float rounding moving a point across a cell line. Zoom in multiplies that error. Keep world positions in doubles until after the camera subtraction (as <code>directionToScreen</code> and <code>craftScreenPoint</code> already do), and apply the scale to the small relative value.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="first-steps">
+      <h2>Suggested first steps</h2>
+      <p>All of these leave the game looking as it does now:</p>
+      <ol class="beats">
+        <li><strong>D5:</strong> split <code>MACRO_PIXEL_SIZE</code> into the world cell and the screen cell.</li>
+        <li>Add <code>zoom</code> to <code>ViewTransform</code>, with <code>lengthToScreen</code>, and make <code>directionToScreen</code> honest about scale. Route <code>SpeckField</code> through it.</li>
+        <li>Remove the player-at-the-anchor shortcuts: draw the player with <code>worldToScreen</code>, and measure indicator range from the player.</li>
+        <li>Give gameplay its own view (D4), separate from the render camera.</li>
+        <li>A debug camera (offset with the mouse, zoom with the wheel, as the effects dials do) as the look-test bench for D1 (A vs B1) and D6.</li>
+      </ol>
+      <p>Then decide D1–D3 with Jesse from the look test, and write the full design.</p>
+    </section>
+
+    <section id="questions">
+      <h2>Open questions</h2>
+      <ul class="plain">
+        <li>D2: what zoom is for, the range, and who controls it.</li>
+        <li>D3: does a moved camera keep the player's angle, or have its own?</li>
+        <li>Should gameplay and cinematic cells unify? Gameplay cells are 4.5 px and cinematic cells are 9 px. Under A, a 2× zoom-in would match the cinematic cell size, which might make cutting between scenes and gameplay seamless. Is that worth anything?</li>
+        <li>Under B2, does Jesse want to draw art at fixed zoom steps (like sprite LODs), or accept what the import makes from the high-res source?</li>
+      </ul>
+    </section>
+  </main>
+
+  <footer><a href="./">← Back to Jet's Wiki</a></footer>
+
+  <script>
+  (function () {
+    // The "high-resolution art": a ship shape in unit space, nose right. u: 0 tail to 1 nose; v: -0.5..0.5.
+    function shade(u, v) {
+      var a = Math.abs(v);
+      if (u > 0.1 && u < 0.98 && a < 0.16 * (1 - Math.pow((u - 0.1) / 0.88, 3))) {
+        if (u > 0.62 && u < 0.84 && a < 0.07) return "--ship-glass";
+        return "--ship-body";
+      }
+      if (u > 0.2 && u < 0.58 && a < 0.46 - (u - 0.2) * 1.1 && a >= 0.1) return "--ship-dark";
+      if (u > 0.02 && u <= 0.12 && a < 0.09) return "--ship-flame";
+      return null;
+    }
+    var NS = "http://www.w3.org/2000/svg";
+    // Draw [cols x rows] cells of [cell] px; colorAt(col,row) gives a token or null.
+    function grid(cols, rows, cell, colorAt) {
+      var w = cols * cell, h = rows * cell;
+      var svg = document.createElementNS(NS, "svg");
+      svg.setAttribute("viewBox", "0 0 " + w + " " + h);
+      svg.setAttribute("role", "img");
+      var bg = document.createElementNS(NS, "rect");
+      bg.setAttribute("width", w); bg.setAttribute("height", h);
+      bg.setAttribute("fill", "var(--pixel-bg)");
+      svg.appendChild(bg);
+      for (var r = 0; r < rows; r++) for (var c = 0; c < cols; c++) {
+        var t = colorAt(c, r);
+        if (!t) continue;
+        var px = document.createElementNS(NS, "rect");
+        px.setAttribute("x", c * cell); px.setAttribute("y", r * cell);
+        px.setAttribute("width", cell); px.setAttribute("height", cell);
+        px.setAttribute("fill", "var(" + t + ")");
+        svg.appendChild(px);
+      }
+      // Screen cell lines, faint, so the grid size reads
+      for (var x = 0; x <= w; x += 8) {
+        var l = document.createElementNS(NS, "line");
+        l.setAttribute("x1", x); l.setAttribute("x2", x); l.setAttribute("y1", 0); l.setAttribute("y2", h);
+        l.setAttribute("stroke", "var(--pixel-grid)"); l.setAttribute("stroke-width", "0.5");
+        svg.appendChild(l);
+      }
+      for (var y = 0; y <= h; y += 8) {
+        var m = document.createElementNS(NS, "line");
+        m.setAttribute("y1", y); m.setAttribute("y2", y); m.setAttribute("x1", 0); m.setAttribute("x2", w);
+        m.setAttribute("stroke", "var(--pixel-grid)"); m.setAttribute("stroke-width", "0.5");
+        svg.appendChild(m);
+      }
+      return svg;
+    }
+    // The 1x sprite: 14 x 8 cells, sampled at cell centers
+    var C = 14, R = 8;
+    function base(c, r) { return shade((c + 0.5) / C, (r + 0.5) / R - 0.5); }
+    // Shown in a 28 x 16 cell window of 8 px screen cells (2x zoom)
+    var panels = [
+      { tag: "1× today", cap: "40-cell ship, here 14 cells long.", svg: grid(28, 16, 8, function (c, r) {
+          var cc = c - 7, rr = r - 4; return (cc >= 0 && cc < C && rr >= 0 && rr < R) ? base(cc, rr) : null; }) },
+      { tag: "A · cells scale", cap: "Same 14 cells, each twice as big. Grid lines show the 1× cell.", svg: grid(14, 8, 16, base) },
+      { tag: "B1 · fixed, sampled", cap: "Fixed cells; each art cell becomes a 2×2 block.", svg: grid(28, 16, 8, function (c, r) {
+          return base(Math.floor(c / 2), Math.floor(r / 2)); }) },
+      { tag: "B2 · fixed, re-imported", cap: "Fixed cells; the art is imported at 28 cells long.", svg: grid(28, 16, 8, function (c, r) {
+          return shade((c + 0.5) / 28, (r + 0.5) / 16 - 0.5); }) }
+    ];
+    var host = document.getElementById("panels");
+    panels.forEach(function (p) {
+      var d = document.createElement("div"); d.className = "panel";
+      var t = document.createElement("div"); t.className = "tag"; t.textContent = p.tag;
+      p.svg.setAttribute("aria-label", p.tag + ": " + p.cap);
+      var cap = document.createElement("div"); cap.className = "cap"; cap.textContent = p.cap;
+      d.appendChild(t); d.appendChild(p.svg); d.appendChild(cap);
+      host.appendChild(d);
+    });
+  })();
+  </script>
+</body>
+</html>
