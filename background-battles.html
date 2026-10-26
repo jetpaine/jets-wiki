@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Background Battles · Jet's Wiki</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Creepster&family=Nunito:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="leaves" aria-hidden="true">
+    <span>🍂</span><span>🍁</span><span>🍂</span><span>🦇</span><span>🍁</span><span>🍂</span><span>🍁</span>
+  </div>
+
+  <header>
+    <p class="crumbs"><a href="./">Jet's Wiki</a> / Defender X</p>
+    <h1 class="page-title">Background Battles</h1>
+    <p class="tagline">Defender X &middot; Jesse Paine &middot; 26 Oct 2026</p>
+    <nav class="toc">
+      <a href="#tldr">TL;DR</a>
+      <a href="#what">What a background battle is</a>
+      <a href="#depth">How depth works when the world rotates</a>
+      <a href="#falloff">Rendering the falloff: haze, dark, or a tinted layer</a>
+      <a href="#scale">Scale: what happens below one macro-pixel</a>
+      <a href="#effects">Effects at a distance</a>
+      <a href="#simulation">Simulation</a>
+      <a href="#cost">Cost</a>
+      <a href="#decisions">Decisions needed</a>
+      <a href="#build">Build plan</a>
+    </nav>
+  </header>
+
+  <main class="article">
+    <section id="tldr">
+      <h2>TL;DR</h2>
+      <p><strong>Recommendation: draw each background battle into its own cell buffer at a fixed depth, then lay one tinted "medium" over it. The medium's color and opacity, set per level, give haze, darkness, or anything between.</strong> Small ships get pre-shrunk art and, below a few cells, become glints, so nothing is ever drawn finer than the macro-pixel grid.</p>
+      <ul class="plain">
+        <li><strong>Depth = one number per layer.</strong> A layer at depth <em>s</em> draws ships at <em>s</em> × their size and moves them at <em>s</em> × the camera's speed, around the same rotation as everything else. Two or three fixed layers (for example 0.5, 0.25, 0.12) line up with the parallax star specks already in the game.</li>
+        <li><strong>One medium pass does haze and dark.</strong> Per layer: a fog color, how much of it covers the ships, and how see-through the layer is. Haze is a light fog color with the layer fully solid. Dark is black fog plus some see-through, so the nebula shows behind distant ships instead of black cut-outs. Explosions and tracers get less fog than hulls, so distant fights still flash in the dark.</li>
+        <li><strong>Scale never goes below one cell.</strong> Today's renderer samples one art pixel per cell. At half size, half the art's pixels just vanish, and details flicker as the world turns. The fix is art pre-shrunk to each layer's size (hand-touched where it matters), drawn by coverage. Below about 3 cells, a ship becomes a 1–2 cell glint.</li>
+        <li><strong>The simulation is the cheap part.</strong> The foreground's 20 ships take about 0.1 ms a tick (simBench). A background world at 30 Hz costs a few percent of a frame. The prerequisite is that projectiles and effects are global today, and each World needs its own.</li>
+        <li><strong>Decisions for you:</strong> how many layers, hand-drawn or automatic small art, the fog palette per level, and whether a ship can ever cross from background to foreground.</li>
+      </ul>
+    </section>
+
+    <section id="what">
+      <h2>What a background battle is</h2>
+      <p><strong>A real fight, simulated live, that the player sees behind their own dogfight but can't touch.</strong> It sells the BSG scale: the player's 8–20 ship fight is one corner of something bigger. Already decided in the language doc's review:</p>
+      <ul class="plain">
+        <li><strong>Scale:</strong> at most ~20 ships in the foreground simulation, ~40 with a real-time background battle. Fleet-sized battles stay abstract, in the Level Conductor.</li>
+        <li><strong>Isolation:</strong> a background battle runs as its own World, with its own random-number stream and a slower tick, so it can't disturb the foreground or the golden replays.</li>
+        <li><strong>Timing:</strong> post-demo. Nothing here competes with the Next Fest minimum.</li>
+      </ul>
+      <p><strong>What the player should read from it at a glance:</strong> two sides fighting (tracers crossing, ships turning), losses (flashes, a ship going down in smoke), and distance (smaller, slower, softer than the foreground). The player shouldn't mistake a background ship for a threat. That's the main job of the depth rendering below.</p>
+    </section>
+
+    <section id="depth">
+      <h2>How depth works when the world rotates</h2>
+      <p><strong>Give each background layer one number, its depth <em>s</em>, and derive everything from it. A ship at depth <em>s</em> is drawn <em>s</em> × its size and moves <em>s</em> × as fast as the camera, around the same rotation as the foreground.</strong></p>
+      <p>The camera here doesn't move like a scrolling shooter's: the player stays put on screen, and the world turns and slides around them (<code>ViewTransform</code>). For a background layer:</p>
+      <ul class="plain">
+        <li><strong>Rotation is the same at every depth.</strong> The view turning is the player's nose turning, so distant ships turn with everything else, around the same anchor. No per-layer angle.</li>
+        <li><strong>Position and size both scale by <em>s</em>.</strong> On screen, a background ship sits at the anchor plus <em>s</em> × its rotated offset from the camera. Tying size and parallax to the same <em>s</em> is what a real lens does, so nothing looks wrong. The background World can use ordinary world units, and its ships 2,000 units away look 2,000 × <em>s</em> away.</li>
+        <li><strong>It matches what's already there.</strong> <code>SpeckField</code> already scrolls four layers of specks at 0.15, 0.35, 0.6 and 1.0 of the camera. Background layers at depths inside that range sit naturally among them.</li>
+      </ul>
+      <figure class="roadmap-fig">
+        <svg class="roadmap stack" viewBox="0 0 760 508" role="img" aria-label="Frame layer stack, back to front: stars and nebula, star specks, new far battle layer, new near battle layer, foreground world, screen effects. The two new layers pass through a per-layer medium pass." font-size="13">
+          <defs><marker id="stack-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--accent)"/></marker></defs>
+          <text x="24" y="30" font-size="15" font-weight="700" fill="var(--fg)">Background battles are two new layers between the specks and the foreground</text>
+          <text x="24" y="52" font-size="11.5" fill="var(--muted)">Drawn top to bottom, back to front. Every layer turns with the world around the player.</text>
+
+          <rect x="24" y="72" width="460" height="56" rx="8" fill="none" stroke="var(--muted)" stroke-width="1.25"/>
+          <text x="40" y="96" font-weight="700" fill="var(--fg)">Stars and nebula</text>
+          <text x="40" y="114" font-size="11.5" fill="var(--muted)">CellBackground: turns with the world, no parallax</text>
+
+          <rect x="24" y="144" width="460" height="56" rx="8" fill="none" stroke="var(--muted)" stroke-width="1.25"/>
+          <text x="40" y="168" font-weight="700" fill="var(--fg)">Star specks</text>
+          <text x="40" y="186" font-size="11.5" fill="var(--muted)">SpeckField: four layers moving at 0.15 to 1.0 of the camera</text>
+
+          <rect x="24" y="216" width="460" height="56" rx="8" fill="var(--accent)" fill-opacity="0.12" stroke="var(--accent)" stroke-width="2"/>
+          <text x="40" y="240" font-weight="700" fill="var(--accent)">New: far battle layer, s = 0.2</text>
+          <text x="40" y="258" font-size="11.5" fill="var(--fg)">Ships 8 cells long, moving at 0.2 of the camera, in their own cell buffer</text>
+
+          <rect x="24" y="288" width="460" height="56" rx="8" fill="var(--accent)" fill-opacity="0.12" stroke="var(--accent)" stroke-width="2"/>
+          <text x="40" y="312" font-weight="700" fill="var(--accent)">New: near battle layer, s = 0.5</text>
+          <text x="40" y="330" font-size="11.5" fill="var(--fg)">Ships 20 cells long, moving at 0.5 of the camera, in their own cell buffer</text>
+
+          <rect x="24" y="360" width="460" height="56" rx="8" fill="none" stroke="var(--muted)" stroke-width="1.25"/>
+          <text x="40" y="384" font-weight="700" fill="var(--fg)">Foreground world, s = 1</text>
+          <text x="40" y="402" font-size="11.5" fill="var(--muted)">The player's fight: ships 40 cells long</text>
+
+          <rect x="24" y="432" width="460" height="56" rx="8" fill="none" stroke="var(--muted)" stroke-width="1.25"/>
+          <text x="40" y="456" font-weight="700" fill="var(--fg)">Screen effects</text>
+          <text x="40" y="474" font-size="11.5" fill="var(--muted)">Bloom, glow, greyout and scanlines, over everything</text>
+
+          <g fill="none" stroke="var(--accent)" stroke-width="1.25">
+            <path d="M484 244H524" marker-end="url(#stack-arrow)"/>
+            <path d="M484 316H524" marker-end="url(#stack-arrow)"/>
+          </g>
+          <rect x="524" y="216" width="212" height="128" rx="8" fill="var(--accent-2)" fill-opacity="0.15" stroke="var(--accent-2)" stroke-width="1.25"/>
+          <text x="540" y="240" font-weight="700" fill="var(--fg)">Medium pass, per layer</text>
+          <text x="540" y="262" font-size="11.5" fill="var(--fg)">Fog color</text>
+          <text x="540" y="278" font-size="11.5" fill="var(--fg)">Fog amount</text>
+          <text x="540" y="294" font-size="11.5" fill="var(--fg)">Visibility over the backdrop</text>
+          <text x="540" y="310" font-size="11.5" fill="var(--fg)">Light fog, for flashes</text>
+          <text x="540" y="332" font-size="11.5" fill="var(--muted)">Set per level</text>
+        </svg>
+        <figcaption>Frame layer stack: back to front, with two background layers.</figcaption>
+      </figure>
+      <p>Two layers is the suggested start (the decision is below). Each layer draws into its own small cell buffer, one pixel per cell, the way <code>CellBackground</code> and <code>VaporGrid</code> do. The medium pass then lays it over what's behind.</p>
+    </section>
+
+    <section id="falloff">
+      <h2>Rendering the falloff: haze, dark, or a tinted layer</h2>
+      <p><strong>Build the tinted layer. It isn't a third option, it's the machinery that does the other two.</strong> Haze and "fading into the dark" are both "mix the far ships toward a color by an amount that grows with depth". Only the color, and whether the backdrop shows through, differ.</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Approach</th><th>How it looks</th><th>Good for</th><th>Falls short</th></tr></thead>
+        <tbody>
+          <tr><td>Atmospheric haze</td><td>Far ships wash toward the sky color, losing contrast</td><td>Planetary levels: the BSG-over-a-planet shot</td><td>In space there's no air; haze looks wrong over black</td></tr>
+          <tr><td>Fade into the dark</td><td>Far ships darken toward black</td><td>Deep space, night side</td><td>Dark ships over the nebula read as black cut-outs, not as distant</td></tr>
+          <tr><td>Single tinted layer, opacity per depth</td><td>Whatever color and amount the level sets</td><td>Both of the above, plus colored nebula light, smoke, a sunset</td><td>Needs one more control (below) to avoid cut-outs in the dark</td></tr>
+        </tbody>
+      </table></div>
+      <p><strong>The medium pass, per depth layer, takes three numbers set per level:</strong></p>
+      <ol class="beats">
+        <li><strong>Fog color:</strong> what far things turn into (a pale sky blue, black, a nebula's purple).</li>
+        <li><strong>Fog amount</strong> (0–1): how much of that color covers the layer's ships.</li>
+        <li><strong>Visibility</strong> (0–1): how solid the layer is over the backdrop. Below 1, stars and nebula show <em>through</em> distant ships. That's what makes a dark-space fade read as distance rather than as a black silhouette.</li>
+      </ol>
+      <p>Haze: sky color, amount rising with depth, visibility 1. Dark space: black, amount rising, visibility falling. In between, tinted nebula light, or the smoke of a burning capital ship hanging over a layer.</p>
+      <p><strong>Lights get their own, smaller fog amount.</strong> Flashes, tracers, engine flames and fire draw additively and should fight the fog less than hulls do. In the dark, a distant battle is mostly its lights: hulls nearly gone, muzzle flashes and explosions still popping. In haze, the same lights bloom and soften. One extra number per layer ("light fog") covers both.</p>
+      <p><strong>Where it sits in the frame:</strong> stars and nebula (<code>CellBackground</code>), then the speck layers, then each background layer far to near, each composited through its medium, then the foreground world, then the screen effects over everything. The existing bloom and greyout apply to the background battle too, for free.</p>
+    </section>
+
+    <section id="scale">
+      <h2>Scale: what happens below one macro-pixel</h2>
+      <p><strong>Nothing in the background should ever be drawn finer than the 4.5 px cell, and the current renderer can't shrink art well. Small ships need their own art.</strong></p>
+      <p><strong>How the renderer works today.</strong> <code>MacroPixelRenderer</code> walks the screen cells a ship covers. For each cell, it turns the cell's center back into the ship's art and takes the <em>one</em> art pixel under it (nearest sampling). The cells stay square to the screen while the ship turns under them. At full size this is exactly right: ships are 40 cells long (<code>PLAYER_SPRITE_LENGTH_PX</code>, <code>ENEMY_SPRITE_LENGTH_PX</code>), one art pixel per cell. There is no scale parameter yet.</p>
+      <p><strong>What goes wrong if you just add one.</strong> At scale <em>s</em>, each cell covers 1/<em>s</em> art pixels in each direction and still picks one:</p>
+      <ul class="plain">
+        <li><strong>Detail drops out:</strong> at 0.5, three of every four art pixels are never drawn. A one-pixel cockpit stripe or engine glow is drawn or not depending on where the cell centers happen to land.</li>
+        <li><strong>It flickers as the world turns:</strong> the world rotates constantly, so the landing points move every frame, and thin features wink in and out. The background stars already do this, by design (<code>CellBackground</code>: "stars smaller than a cell can wink"). On ships it reads as noise.</li>
+        <li><strong>Below one cell it's random:</strong> a ship smaller than a cell either lands on a cell center (one solid cell) or doesn't (nothing). It pops in and out as it moves.</li>
+      </ul>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Layer depth <em>s</em></th><th>Ship length</th><th>What it needs</th></tr></thead>
+        <tbody>
+          <tr><td>1 (foreground)</td><td>40 cells</td><td>Today's art and renderer</td></tr>
+          <tr><td>0.5</td><td>20 cells</td><td>Pre-shrunk art</td></tr>
+          <tr><td>0.25</td><td>10 cells</td><td>Pre-shrunk art, hand-touched (silhouette, engine glow kept)</td></tr>
+          <tr><td>0.12</td><td>~5 cells</td><td>A few-cell icon per ship type, mostly silhouette and engine</td></tr>
+          <tr><td>below ~0.08</td><td>under 3 cells</td><td>A glint: 1–2 cells, brightness from size and heading, engine color when thrusting</td></tr>
+        </tbody>
+      </table></div>
+      <p><strong>Options for the in-between sizes:</strong></p>
+      <ol class="beats">
+        <li><strong>Pre-shrunk art per layer (recommended).</strong> Downsample each ship's art to each layer's size once, at load, by area (each small pixel = the average of the art pixels it covers). The art can then be hand-touched, the way pixel artists redraw small sprites rather than shrink them. It keeps the look stable as the world turns, because each cell samples art made for that size. Cost: one extra image per ship type per layer.</li>
+        <li><strong>Coverage sampling at runtime.</strong> Each cell averages the art pixels it covers, with partly covered edge cells drawn faint. It works at any scale, and ships can move smoothly between cells instead of jumping a whole cell. But it's more work per cell every frame and needs no art, so it never looks hand-made.</li>
+        <li><strong>A finer cell grid for far layers</strong> (for example 2.25 px cells at half depth). It keeps detail, but two pixel sizes on screen at once ("mixels") break the 16-bit look the game is built on. Not recommended, except perhaps as a deliberate effect under heavy haze.</li>
+      </ol>
+      <p><strong>Also: sub-cell motion.</strong> A 5-cell ship that moves at background speed advances less than a cell most frames, so it would sit still and then jump. Two fixes, both cheap: draw small layers into a cell buffer by coverage, the way <code>VaporGrid</code> already draws vapor, so a ship between two cells lights both faintly; or accept the stair-step, which matches how the specks and background already move. Worth judging in a visual test.</p>
+    </section>
+
+    <section id="effects">
+      <h2>Effects at a distance</h2>
+      <p><strong>Effects carry the background battle more than hulls do, so they get the most care. Most of the existing systems already work in cells and only need a size factor.</strong></p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Effect</th><th>Today</th><th>In a background layer</th></tr></thead>
+        <tbody>
+          <tr><td>Bullet streaks (<code>ProjectileRenderer</code>)</td><td>Lines of cells, 1 cell wide</td><td>Same width, length × <em>s</em>. A streak never goes below 1 cell wide, so tracers stay visible far out: that's the point.</td></tr>
+          <tr><td>Muzzle flash, sparks, hit flashes (<code>Effects</code>, light kinds)</td><td>Cells sized in world units</td><td>Size × <em>s</em>, with a 1-cell floor. Lighter fog ("light fog" above).</td></tr>
+          <tr><td>Explosions, fire</td><td>Particles in cells; hull breaks into its own cells</td><td>Fewer, bigger-looking particles: scale count and size, keep a floor. A capital-ship death should still read from the farthest layer.</td></tr>
+          <tr><td>Smoke (<code>VaporGrid</code> smoke grid)</td><td>One screen grid, drawn over hulls</td><td>A grid per layer (it's built for this: cost doesn't grow with particles). It is fogged like hulls.</td></tr>
+          <tr><td>Vapor trails (<code>VaporGrid</code>)</td><td>One screen grid; trails up to 90 s</td><td>A grid per layer, shorter lifetime. Long trails at a distance are what sell the scale.</td></tr>
+          <tr><td>Heat shimmer, screen shake</td><td>Player-centred</td><td>None for background events. A very large explosion could add a faint shake, delayed by distance, as a deliberate choice.</td></tr>
+          <tr><td>Engine flames</td><td>Cells at the hull's engine point</td><td>Size × <em>s</em>, and kept as the last cell of a glint-sized ship, so far ships show which way they're flying.</td></tr>
+        </tbody>
+      </table></div>
+      <p><strong>Sound</strong> (worth deciding with the audio system): distant battles as low, muffled thuds, delayed slightly by distance, is a cheap, strong depth cue. It would go through the gameplay audio system that's on the Next Fest list.</p>
+    </section>
+
+    <section id="simulation">
+      <h2>Simulation</h2>
+      <p><strong>A background battle is a second World with no player in it: two AI teams fighting, at a slower tick, drawn through a depth layer. Two things in the code have to change first.</strong></p>
+      <p><strong>Prerequisites:</strong></p>
+      <ol class="beats">
+        <li><strong>Projectiles and effects belong to one World.</strong> <code>ProjectileSystem</code> and <code>Effects</code> are global objects today (<code>World.dispose</code> clears them for the next game). A second World would share their bullets and particles, so background rounds could hit foreground ships. Each World needs its own instance. It's a mechanical refactor, and the golden replays prove it changes nothing.</li>
+        <li><strong>A World without a player, and AI on both sides.</strong> World is built around the player's <code>Ship</code>. Enemy AI fights the player, not other AI. Wingmen (AI on the player's side) are already a Next Fest item. Background battles reuse that: two AI teams, each targeting the other.</li>
+      </ol>
+      <p><strong>Tick and smoothness.</strong> Background ships move at <em>s</em> × the screen speed, so a slower tick hardly shows: 30 Hz (a quarter of the foreground's 120 Hz) is the starting point. Drawing interpolates between the last two ticks so motion stays smooth at 60 fps.</p>
+      <p><strong>Determinism and replays.</strong> The background World gets its own seed, derived from the level's, and its own Random. The foreground's golden replays never see it. It can have golden replays of its own if the Conductor ever depends on its outcome.</p>
+      <p><strong>Level of detail.</strong> Far layers don't need the full model. The farthest can drop g-forces, vapor physics and collision between ships, keeping flight, AI targeting, hits and deaths. Fewer decisions per second (AI every 4th tick) is another easy cut. Start with the full model and cut only where simBench says to.</p>
+      <p><strong>Interaction with the foreground: none, by default.</strong> Different depths never collide, and rounds don't cross layers. The Level Conductor owns any link: a background loss that changes the foreground's waves, or a capital ship whose death a cutscene shows. A ship climbing from background to foreground (scaling up through the layers) is possible, but it's a scripted effect, not physics. Its own decision below.</p>
+    </section>
+
+    <section id="cost">
+      <h2>Cost</h2>
+      <p><strong>Expected to be small on both CPU and GPU. Drawing, not simulation, is the part to watch, and your baseline run will settle it.</strong></p>
+      <ul class="plain">
+        <li><strong>Simulation (measured):</strong> <code>-PsimBench</code> ran 20 ships at about 0.10–0.15 ms a tick, and 20+20 in one world at about 0.15 ms, with collision the only part growing faster than linearly. A separate 20-ship background World at 30 Hz is roughly 0.1 ms × 30 ticks a second = about 3 ms of CPU per second, under 0.5% of a core. These were measured in a cloud container, not your machine.</li>
+        <li><strong>Drawing on the CPU (not yet measured):</strong> ships are drawn cell by cell through <code>ShapeRenderer</code>. Cell count goes with <em>s</em>², so a ship at 0.5 costs a quarter of a foreground ship and at 0.25 a sixteenth: 20 background ships at 0.5 cost about as much as 5 foreground ships. Your <code>-PsimBench</code> baseline (its "draw" column) is the number to check this against.</li>
+        <li><strong>Drawing on the GPU (estimated):</strong> one small cell-sized buffer per layer (about 427×240 pixels) and one full-screen composite for the medium. That's far cheaper than any single screen effect: the full bloom stack measured about 11 ms at 3584×1982, and the medium is one pass of simple math.</li>
+        <li><strong>Memory:</strong> a vapor and a smoke grid per layer (about 100k cells each), and the pre-shrunk art. Small.</li>
+      </ul>
+      <p><strong>If drawing turns out heavy,</strong> the GPU-instanced cells planned in issue #18 cover background layers too. Upload each ship's cells once and let a shader place them.</p>
+    </section>
+
+    <section id="decisions">
+      <h2>Decisions needed</h2>
+      <p><strong>Five calls only you can make. Each has a default that lets work start without it.</strong></p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Decision</th><th>Options</th><th>Default until decided</th></tr></thead>
+        <tbody>
+          <tr><td>How many depth layers, at what depths</td><td>1 (simple), 2, or 3; depths from 0.5 down to ~0.1</td><td>2 layers: 0.5 and 0.2</td></tr>
+          <tr><td>Small ship art</td><td>Automatic downsampling only; automatic, then hand-touched; hand-drawn per size</td><td>Automatic, so it works; hand-touching comes when the art is final</td></tr>
+          <tr><td>Fog per level</td><td>A palette per level: haze, dark, tinted; whether it changes during a level (smoke rolling in, the sun setting)</td><td>Two presets, "planet haze" and "deep space", tunable live in TUNING</td></tr>
+          <tr><td>Can a ship cross between depths</td><td>No; scripted only (the Conductor or a cutscene); in play</td><td>No</td></tr>
+          <tr><td>What the background means</td><td>Decoration; driven by the Conductor's abstract battle (its losses show up there); its outcome drives the Conductor</td><td>Decoration, with hooks the Conductor can use later</td></tr>
+        </tbody>
+      </table></div>
+      <ul class="checks">
+        <li><span class="box">☐</span> Layers and depths</li>
+        <li><span class="box">☐</span> Small ship art</li>
+        <li><span class="box">☐</span> Fog palette per level</li>
+        <li><span class="box">☐</span> Crossing between depths</li>
+        <li><span class="box">☐</span> Link to the <a href="level-conductor.html">Level Conductor</a></li>
+      </ul>
+    </section>
+
+    <section id="build">
+      <h2>Build plan</h2>
+      <p><strong>Look first, simulate second. The rendering questions are the risky part and can be judged in visual tests before any background AI exists.</strong> Each step ends in something you can see from the VISUAL TESTS menu.</p>
+      <ol class="beats">
+        <li><strong>Depth layer, still ships.</strong> A <code>DepthLayer</code> (depth <em>s</em>) that draws a list of ships into its own cell buffer at <em>s</em> × size and parallax, turning with the world. Visual test "BACKGROUND DEPTHS": the same ship parked at 1, 0.5, 0.25 and 0.12, while you fly around.</li>
+        <li><strong>The medium pass.</strong> Fog color, fog amount, visibility and light fog per layer, in TUNING, with "planet haze" and "deep space" presets. Judged in the same visual test.</li>
+        <li><strong>Small art.</strong> Area-downsampled art per layer, plus the glint below ~3 cells, side by side with plain nearest sampling in the visual test, so the difference is visible.</li>
+        <li><strong>Effects at depth.</strong> Scale streaks, flashes, explosions, smoke and vapor by <em>s</em> with 1-cell floors. Visual test: a scripted fight parked in a background layer.</li>
+        <li><strong>Per-World projectiles and effects.</strong> The refactor in Simulation. No visible change; the golden replays must still match.</li>
+        <li><strong>Background World.</strong> Two AI teams (on the wingmen AI), 30 Hz with interpolation, own seed. <code>-PsimBench</code>'s 20+20 stage switches to a real second World.</li>
+        <li><strong>Conductor hooks.</strong> Start, stop and steer a background battle from the Level Conductor once it exists.</li>
+      </ol>
+      <p>Steps 1–4 need only the renderer and can start any time after Next Fest. Step 5 can go in whenever it's convenient: it's invisible and guarded by the golden replays. Step 6 waits on wingmen AI.</p>
+    </section>
+  </main>
+
+  <footer><a href="./">← Back to Jet's Wiki</a></footer>
+</body>
+</html>
