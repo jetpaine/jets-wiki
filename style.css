@@ -231,3 +231,15 @@ section li a { color: var(--accent-2); font-weight: 700; }
 @media (max-width: 520px) {
   .dec { grid-template-columns: 1fr; }
 }
+
+/* Long pages: a contents list instead of a one-line menu */
+nav.toc { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 4px 20px; text-align: left; counter-reset: toc; }
+nav.toc a { font-size: 0.92rem; counter-increment: toc; }
+nav.toc a::before { content: counter(toc) ". "; color: var(--muted); font-weight: 400; }
+.article ul.checks { list-style: none; padding-left: 4px; margin: 0 0 14px; }
+.article ul.checks li { padding: 4px 0 4px 26px; text-indent: -26px; }
+.article ul.checks li::before { content: none; }
+.article ul.checks .box { display: inline-block; width: 22px; text-indent: 0; color: var(--accent); }
+.roadmap-fig { margin: 8px 0 18px; overflow-x: auto; }
+.roadmap { display: block; width: 100%; min-width: 620px; height: auto; font-family: "Nunito", system-ui, sans-serif; }
+.roadmap-fig figcaption { color: var(--muted); font-size: 0.88rem; font-style: italic; margin-top: 6px; text-align: center; }
