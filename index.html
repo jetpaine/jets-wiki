@@ -4,52 +4,59 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Jet's Wiki</title>
-  <style>
-    :root { --bg: #fafaf9; --fg: #1c1917; --muted: #57534e; --accent: #2563eb; --card: #ffffff; --border: #e7e5e4; }
-    @media (prefers-color-scheme: dark) {
-      :root { --bg: #1c1917; --fg: #f5f5f4; --muted: #a8a29e; --accent: #60a5fa; --card: #292524; --border: #44403c; }
-    }
-    * { box-sizing: border-box; }
-    body { margin: 0; font-family: system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--fg); line-height: 1.6; }
-    header, main, footer { max-width: 760px; margin: 0 auto; padding: 0 16px; }
-    header { padding-top: 48px; }
-    h1 { margin: 0 0 4px; font-size: 2.25rem; }
-    .tagline { color: var(--muted); margin: 0 0 32px; }
-    nav { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 32px; border-bottom: 1px solid var(--border); padding-bottom: 12px; }
-    nav a { color: var(--accent); text-decoration: none; }
-    section { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 20px 24px; margin-bottom: 20px; }
-    h2 { margin-top: 0; font-size: 1.3rem; }
-    footer { color: var(--muted); font-size: 0.9rem; padding-bottom: 48px; }
-  </style>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Creepster&family=Nunito:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
+  <div class="leaves" aria-hidden="true">
+    <span>🍂</span><span>🍁</span><span>🍂</span><span>🦇</span><span>🍁</span><span>🍂</span><span>🍁</span>
+  </div>
+
   <header>
+    <svg class="moon" viewBox="0 0 72 72" aria-hidden="true">
+      <circle cx="36" cy="36" r="30" fill="#fde68a"/>
+      <circle cx="26" cy="28" r="5" fill="#fcd34d"/>
+      <circle cx="44" cy="44" r="7" fill="#fcd34d"/>
+      <circle cx="46" cy="24" r="3" fill="#fcd34d"/>
+    </svg>
     <h1>Jet's Wiki</h1>
-    <p class="tagline">A placeholder home for notes, guides, and ideas.</p>
+    <p class="tagline">A cozy, slightly spooky home for notes, guides, and ideas.</p>
     <nav>
       <a href="#about">About</a>
       <a href="#getting-started">Getting Started</a>
       <a href="#topics">Topics</a>
     </nav>
   </header>
+
   <main>
     <section id="about">
-      <h2>About</h2>
+      <h2>🎃 About</h2>
       <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris.</p>
     </section>
+
     <section id="getting-started">
-      <h2>Getting Started</h2>
+      <h2>🕯️ Getting Started</h2>
       <p>Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident.</p>
     </section>
+
     <section id="topics">
-      <h2>Topics</h2>
+      <h2>📜 Topics</h2>
       <ul>
-        <li><a href="defender-x/">Defender X</a>: how the game works on the inside, explained for newcomers</li>
+        <li class="link"><a href="defender-x/">Defender X wiki: how the game works on the inside, explained for newcomers</a></li>
+        <li class="link"><a href="level-conductor.html">Defender X: Level Conductor research</a></li>
+        <li class="link"><a href="enemy-ai.html">Defender X: Enemy AI, how it works</a></li>
+        <li class="link"><a href="camera-zoom.html">Defender X: Camera movement and zoom</a></li>
+        <li class="link"><a href="kotlin-migration.html">Defender X: Migrating from Kotlin</a></li>
+        <li class="link"><a href="background-battles.html">Defender X: Background battles</a></li>
+        <li>Placeholder topic one</li>
         <li>Placeholder topic two</li>
         <li>Placeholder topic three</li>
       </ul>
     </section>
   </main>
-  <footer>Placeholder content &middot; Coming soon</footer>
+
+  <footer>Placeholder content &middot; Happy Halloween 👻</footer>
 </body>
 </html>

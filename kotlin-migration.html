@@ -1,0 +1,314 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Migrating from Kotlin · Jet's Wiki</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Creepster&family=Nunito:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="leaves" aria-hidden="true">
+    <span>🍂</span><span>🍁</span><span>🍂</span><span>🦇</span><span>🍁</span><span>🍂</span><span>🍁</span>
+  </div>
+
+  <header>
+    <p class="crumbs"><a href="./">Jet's Wiki</a> / Defender X</p>
+    <h1 class="page-title">Migrating from Kotlin to a Native Language</h1>
+    <p class="tagline">Defender X &middot; Jesse Paine &middot; 25 Oct 2026</p>
+    <nav class="toc">
+      <a href="#tldr">TL;DR</a>
+      <a href="#why-the-question-changes-when-nobody-rea">Why the question changes when nobody reads the code</a>
+      <a href="#what-exists-today">What exists today</a>
+      <a href="#where-the-frame-time-actually-goes">Where the frame time actually goes</a>
+      <a href="#which-language-if-not-kotlin">Which language, if not Kotlin</a>
+      <a href="#what-libgdx-does-for-you-and-what-replac">What libGDX does for you, and what replaces it</a>
+      <a href="#how-much-faster-it-would-actually-be">How much faster it would actually be</a>
+      <a href="#what-extra-cycles-could-buy">What extra cycles could buy</a>
+      <a href="#risks-and-what-would-be-lost">Risks, and what would be lost</a>
+      <a href="#how-a-migration-would-go-if-the-numbers">How a migration would go, if the numbers call for it</a>
+      <a href="#the-cheaper-path-get-the-cycles-in-kotli">The cheaper path: get the cycles in Kotlin first</a>
+      <a href="#recommendation-and-next-steps">Recommendation and next steps</a>
+    </nav>
+  </header>
+
+  <main class="article">
+    <section id="tldr">
+      <h2>TL;DR</h2>
+      <p><strong>Recommendation: don&#x27;t migrate now, and if you ever do, don&#x27;t pick C.</strong> The evidence in the repo says Defender X isn&#x27;t held back by Kotlin today. Its measured costs are GPU shader work, which runs the same speed whatever language calls it.</p>
+      <ul class="plain">
+        <li><strong>The bottleneck isn&#x27;t the language.</strong> The only recorded timings are screen effects: about 11 ms worst case with every effect on at 3584×1982, and ~6 ms of that is smooth bloom. That&#x27;s fragment-shader time on the graphics card. A C port would make it 0% faster.</li>
+        <li><strong>The hot CPU code is already written like C.</strong> The 6,000-particle effects system keeps its state in flat <code>FloatArray</code>s, the layout a C programmer would choose. On that kind of code the JVM&#x27;s JIT typically lands within 1.0–1.5× of C.</li>
+        <li><strong>Realistic gains from a native port:</strong> maybe 1.2–2× on CPU-heavy simulation loops, no GC hitches, instant startup, roughly 4–8× less memory, and a smaller download. None of these is a visible problem yet.</li>
+        <li><strong>C is the wrong native language for a hands-off workflow.</strong> Nobody reads the PRs, and QA is playtesting. C&#x27;s typical failures (use-after-free, buffer overruns, data races) are intermittent crashes and corruption that playtesting is worst at catching. If you go native, <strong>Rust</strong> fits your workflow better: its compiler catches those bugs instead of you.</li>
+        <li><strong>The port would cost about 17,000 lines of game code, 5,400 lines of tests, and a rebuild of what libGDX does for you.</strong> It would also put the tuned feel of flight, AI and effects at risk, four months before Steam Next Fest (Feb 22, 2027).</li>
+        <li><strong>The &quot;extra cycles&quot; ideas</strong> (hundreds of ships, 100k+ particles, live smoke, bigger AI) mostly come from moving work to the GPU and from better algorithms, which you can do in Kotlin now.</li>
+      </ul>
+      <p><strong>Next step:</strong> add a CPU stress benchmark next to the existing <code>-PfxBench</code>. If it shows the simulation can&#x27;t hold 120 Hz at the scale you want, revisit a native port after Next Fest, starting with a one-subsystem Rust spike.</p>
+    </section>
+    <section id="why-the-question-changes-when-nobody-rea">
+      <h2>Why the question changes when nobody reads the code</h2>
+      <p>You chose Kotlin because you could read and write it. That reason is weaker now: Claude writes the code, and you QA by playtesting. But the other side of the trade changes too. When nobody reviews the diff, the language&#x27;s compiler and tests are the only reviewers left.</p>
+      <p>So the question isn&#x27;t &quot;which language is fastest&quot;. It&#x27;s &quot;which language gives the fastest game <em>that an unsupervised agent can&#x27;t quietly break</em>&quot;. Three things matter more than raw speed:</p>
+      <ol class="beats">
+        <li><strong>What the compiler refuses to build.</strong> Every bug class the compiler rejects is one that never reaches a playtest. Kotlin rejects null dereferences and memory corruption. C rejects neither.</li>
+        <li><strong>How bugs show up.</strong> A Kotlin bug usually means a wrong number or a stack trace that names the line. A C memory bug can be a crash ten minutes later in unrelated code, or a corrupted value that just looks like bad tuning. Playtesting finds the first kind well and the second kind badly.</li>
+        <li><strong>How well agents write it.</strong> Claude writes Kotlin, C, C++ and Rust well. In C, though, correctness depends on discipline that isn&#x27;t enforced anywhere: ownership, lifetimes, bounds. Without human review, nothing checks that discipline.</li>
+      </ol>
+      <p>There&#x27;s also a deadline. <code>notes.txt</code> commits the demo to Steam Next Fest, <strong>Feb 22 to Mar 1, 2027</strong>, with a minimum of the dogfighting loop, the opening cinematic, enemy and wingman AI, and sound. Any migration competes with that list for the next four months.</p>
+    </section>
+    <section id="what-exists-today">
+      <h2>What exists today</h2>
+      <p>Defender X is 16,882 lines of Kotlin in 115 files, plus 5,425 lines of tests. It runs on the JVM (Java 21) with <strong>libGDX 1.11</strong> over <strong>LWJGL 3.3.3</strong> (GLFW + OpenGL + OpenAL), <strong>gdx-vfx 0.5.1</strong> for screen effects, and <strong>JOML</strong> for math. The simulation steps at a fixed <strong>120 Hz</strong> (<code>SIM_TICK_SECONDS = 1/120</code>) and draws to a 1920×1080 virtual canvas in 4.5 px macro-pixel cells (about 427×240 cells).</p>
+      <div class="table-wrap"><table>
+      <thead><tr><th>Package</th><th>Lines</th><th>Files touching libGDX</th><th>What it does</th></tr></thead>
+      <tbody>
+        <tr><td>engine</td><td>3,533</td><td>8 of 16</td><td>GameConfig (1,249 lines of tunables), projectiles, collisions, particle effects, tuning</td></tr>
+        <tr><td>cinema</td><td>2,990</td><td>10 of 23</td><td>Footage conversion (via ffmpeg), scene files, camera rig, takes, scene editor, audio</td></tr>
+        <tr><td>ai</td><td>2,215</td><td>0 of 19</td><td>Sensing, morale state machine, behaviors, behavior trees (Groot2 palette)</td></tr>
+        <tr><td>render</td><td>1,817</td><td>12 of 15</td><td>Macro-pixel sprites, effect cells, vapor grid, glow layer, HUD indicators</td></tr>
+        <tr><td>game</td><td>1,651</td><td>3 of 8</td><td>World, physics state, game loop, world renderer</td></tr>
+        <tr><td>entity</td><td>1,575</td><td>6 of 14</td><td>Craft, ship, enemy, projectile, vapor trails</td></tr>
+        <tr><td>fx</td><td>1,497</td><td>9 of 9</td><td>Bloom/glow, chromatic split, greyout, shimmer, frame timer, FX bench</td></tr>
+        <tr><td>screen, ui, util</td><td>1,023</td><td>7 of 8</td><td>Title, pause, tuning and visual-test menus; retro text</td></tr>
+        <tr><td>physics</td><td>266</td><td>0 of 4</td><td>G-force limiter</td></tr>
+      </tbody></table></div>
+      <p><strong>What the split shows:</strong> the game logic (AI, physics, most of the simulation) has no libGDX in it and would port mostly line by line. The libGDX-heavy half (render, fx, cinema, screens) is the half that needs a new foundation.</p>
+      <p><strong>The libGDX surface in use</strong> is small and conventional: <code>Gdx</code>, <code>Color</code>, <code>Matrix4</code>, <code>Vector2</code>, <code>MathUtils</code>, <code>ShapeRenderer</code>, <code>SpriteBatch</code>, <code>Texture</code>, <code>Pixmap</code>/<code>PixmapIO</code>, <code>FrameBuffer</code>, <code>ShaderProgram</code>, <code>OrthographicCamera</code>, <code>FitViewport</code>, <code>BitmapFont</code>/<code>GlyphLayout</code>, <code>Music</code>/<code>Sound</code>, <code>JsonReader</code>, input keys and the LWJGL3 app launcher. No scene2d UI, no Box2D, no asset manager, no mobile backends.</p>
+      <p><strong>Tooling that leans on the JVM:</strong></p>
+      <ul class="plain">
+        <li><strong><code>aiDiagrams</code></strong> draws the enemy state machine by parsing the Kotlin source with the Kotlin compiler&#x27;s own parser (<code>kotlin-compiler-embeddable</code>). It can&#x27;t survive a language change as is.</li>
+        <li><strong>The TUNING screen</strong> reads and rewrites <code>GameConfig.kt</code> as text with regexes. It would port, but it&#x27;s tied to Kotlin syntax.</li>
+        <li><strong>The behavior-tree ports</strong> use Kotlin reflection (<code>KProperty1</code>, <code>KClass</code>). C and Rust have no runtime reflection, so this becomes macros or generated code.</li>
+        <li><strong>Gradle tasks</strong> (<code>run</code>, <code>runScene</code>, <code>convertCinematic</code>, <code>shipFrames</code>, <code>btPalette</code>, <code>aiDiagrams</code>) become CMake/Cargo commands or scripts.</li>
+      </ul>
+    </section>
+    <section id="where-the-frame-time-actually-goes">
+      <h2>Where the frame time actually goes</h2>
+      <p><strong>Nobody has measured the CPU side yet, and the GPU side is the only known cost.</strong> At 60 fps the budget is 16.7 ms a frame; at 120 Hz simulation, each tick must also fit in 8.3 ms.</p>
+      <p>What the repo records:</p>
+      <ul class="plain">
+        <li><strong>Screen effects (measured, </strong><strong><code>-PfxBench</code></strong><strong>):</strong> all effects on at 3584×1982, about 11 ms worst case; smooth bloom ~6 ms; each other effect ~1 ms. This is fragment-shader and framebuffer bandwidth on the GPU. It scales with pixel count, not language.</li>
+        <li><strong>Vapor trails (observed):</strong> &quot;a screen nearly covered in trails from 6 enemies showed no slowdown.&quot;</li>
+        <li><strong>Scale today:</strong> 8 enemies (<code>ENEMY_SPAWN_COUNT</code>), 0 rocks, a 6,000-particle cap (<code>EFFECT_MAX_PARTICLES</code>).</li>
+      </ul>
+      <p>What the code suggests would cost the most as the game grows. Each of these is an <strong>algorithm or architecture</strong> cost, so it hurts in C as much as in Kotlin:</p>
+      <div class="table-wrap"><table>
+      <thead><tr><th>Hot spot</th><th>Today</th><th>Why it grows</th><th>Fix in any language</th></tr></thead>
+      <tbody>
+        <tr><td>Collision (<code>CollisionSystem.detect</code>)</td><td>Every pair tested: n(n−1)/2, broad-phase circle then SAT</td><td>8 ships = 28 pairs; 300 ships = 44,850 pairs per tick at 120 Hz</td><td>Spatial grid or sweep-and-prune broad phase</td></tr>
+        <tr><td>Effect cells (<code>EffectRenderer</code>)</td><td>Each particle is drawn as a block of <code>ShapeRenderer.rect</code> calls, built on the CPU each frame</td><td>Cost is particles × cells per particle, on the CPU</td><td>GPU instancing: upload particle arrays once, let a shader expand cells</td></tr>
+        <tr><td>Vapor grid (<code>VaporGrid</code>)</td><td>A CPU <code>Pixmap</code> the size of the cell grid, filled and re-uploaded to a texture each frame</td><td>Fixed ~100k cells, but all CPU and a texture upload</td><td>Do it in a shader; already planned as issue #18</td></tr>
+        <tr><td>AI sensing (<code>Sensor</code>)</td><td>Each enemy looks at the world snapshot</td><td>Grows n² with many ships</td><td>Same spatial grid as collision</td></tr>
+        <tr><td>Small per-tick allocations</td><td>A few <code>mutableListOf</code>/<code>map {}</code> in collision, projectiles, renderer</td><td>GC pressure grows with entity count</td><td>Reuse buffers; Java 21&#x27;s ZGC keeps pauses under 1 ms</td></tr>
+      </tbody></table></div>
+      <p><strong>The pattern:</strong> the parts the language affects (raw loop speed, allocation) are not where the visible costs are. The part a language can&#x27;t help with (O(n²) loops, CPU-side drawing, GPU fill) is where scaling would actually break.</p>
+    </section>
+    <section id="which-language-if-not-kotlin">
+      <h2>Which language, if not Kotlin</h2>
+      <p><strong>Rust is the only native option whose compiler stands in for the code review you no longer do.</strong> C is the fastest to write badly. C++ sits between. Zig and Kotlin/Native don&#x27;t fit this project.</p>
+      <div class="table-wrap"><table>
+      <thead><tr><th>Language</th><th>CPU speed vs C</th><th>What the compiler catches</th><th>2D game ecosystem</th><th>Fit for hands-off AI development</th><th>Verdict</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Kotlin / JVM (today)</strong></td><td>~0.7–1.0× on array loops; slower on object-heavy code</td><td>Nulls, types, memory safety (GC)</td><td>libGDX, LWJGL, mature</td><td>Good: bugs are loud, stack traces name the line</td><td>Keep, optimize</td></tr>
+        <tr><td><strong>Rust</strong></td><td>~1.0×</td><td>Memory safety, data races, nulls, exhaustive matches</td><td>Good: SDL3/wgpu/macroquad/Bevy, <code>glam</code>, <code>kira</code> audio, <code>serde</code></td><td>Best of the native options: unsafe code is opt-in and visible</td><td>The pick if you go native</td></tr>
+        <tr><td><strong>C++</strong></td><td>~1.0×</td><td>Types; little memory safety (smart pointers help by convention only)</td><td>Largest: SDL3, raylib, sokol, bgfx, Dear ImGui, everything</td><td>Medium: agents write good C++, but memory bugs pass the compiler</td><td>Viable, riskier</td></tr>
+        <tr><td><strong>C</strong></td><td>1.0×</td><td>Types, loosely</td><td>Good libraries (SDL3, raylib, sokol, miniaudio, stb), little structure</td><td>Poor: no generics, no RAII, manual memory, strings by hand</td><td>Not recommended</td></tr>
+        <tr><td><strong>Zig</strong></td><td>~1.0×</td><td>Better than C (bounds checks in debug, no hidden allocation)</td><td>Thin; uses C libraries directly</td><td>Poor today: language still pre-1.0 and changes, so agents&#x27; knowledge goes stale</td><td>Not yet</td></tr>
+        <tr><td><strong>Kotlin / Native</strong></td><td>Often <em>slower</em> than the JVM JIT</td><td>Same as Kotlin</td><td>No libGDX backend; you&#x27;d rebuild the platform layer anyway</td><td>Same as Kotlin</td><td>No gain</td></tr>
+      </tbody></table></div>
+      <p><strong>Why not C, specifically.</strong> C is the language the original question named, so it deserves a direct answer:</p>
+      <ul class="plain">
+        <li><strong>No safety net.</strong> An off-by-one in the particle arrays writes into the next array. The game keeps running with a wrong value, which a playtest reads as &quot;the smoke looks off&quot;, not as a bug.</li>
+        <li><strong>More code for the same game.</strong> No generics, no lambdas, no RAII, no built-in strings or lists. The behavior trees, scene parser and tuning screen would each grow by perhaps 2–3× in lines, and every line is one nobody reads.</li>
+        <li><strong>No speed edge over C++ or Rust.</strong> All three compile through LLVM or GCC to the same machine code for the same loops.</li>
+      </ul>
+      <p><strong>What you&#x27;d give up leaving Kotlin even for Rust:</strong> you can read Kotlin and step in when needed. Rust is harder to read cold, and compile times are longer (a 20k-line game builds in roughly 5–30 s incrementally, depending on dependencies).</p>
+    </section>
+    <section id="what-libgdx-does-for-you-and-what-replac">
+      <h2>What libGDX does for you, and what replaces it</h2>
+      <p><strong>Nothing in the game&#x27;s feature set would be impossible to rebuild. Every libGDX piece in use has a mature native replacement.</strong> The cost is assembly and glue, roughly 2,000–4,000 lines of platform code that libGDX gives you for free today.</p>
+      <div class="table-wrap"><table>
+      <thead><tr><th>libGDX piece in use</th><th>Used for</th><th>C / C++ replacement</th><th>Rust replacement</th><th>Rebuild effort</th></tr></thead>
+      <tbody>
+        <tr><td><code>Lwjgl3Application</code>, <code>Gdx.graphics</code>, vsync, window</td><td>Window, GL context, frame loop, delta time</td><td>SDL3 or GLFW</td><td>SDL3 bindings, <code>winit</code></td><td>Small</td></tr>
+        <tr><td><code>Gdx.input</code>, <code>InputAdapter</code>, <code>Keys</code>, <code>Buttons</code></td><td>Keyboard, mouse, wheel (camera rig, menus)</td><td>SDL3 events</td><td>SDL3 / <code>winit</code></td><td>Small</td></tr>
+        <tr><td><code>SpriteBatch</code>, <code>Texture</code>, <code>Sprite</code></td><td>Ship art, backgrounds, cinematic frames</td><td>sokol_gfx + a small batcher, or raylib</td><td><code>wgpu</code> + a batcher, or macroquad</td><td>Medium</td></tr>
+        <tr><td><code>ShapeRenderer</code></td><td>Effect cells, HUD, indicators, debug overlay</td><td>Write a quad batcher (~300 lines), or raylib&#x27;s shapes</td><td>Same, or <code>lyon</code></td><td>Medium</td></tr>
+        <tr><td><code>FrameBuffer</code>, <code>ShaderProgram</code>, <code>GL20</code></td><td>Glow layer, masks, every screen effect</td><td>Direct GL / sokol_gfx; GLSL shaders mostly carry over</td><td><code>wgpu</code> (shaders move to WGSL) or <code>glow</code> (keep GLSL)</td><td>Medium</td></tr>
+        <tr><td>gdx-vfx (<code>VfxPingPongWrapper</code>, effect chain)</td><td>Bloom, chromatic split, vignette, grain, scanlines, greyout, shimmer</td><td>No equivalent library: rewrite the ping-pong chain (~500 lines)</td><td>Same</td><td>Medium–large</td></tr>
+        <tr><td><code>Pixmap</code>, <code>PixmapIO</code></td><td>Loading PNGs, vapor grid, <code>shipFrames</code> output, convex hulls from sprites</td><td>stb_image, stb_image_write</td><td><code>image</code> crate</td><td>Small</td></tr>
+        <tr><td><code>BitmapFont</code>, <code>GlyphLayout</code></td><td>Retro text, dialogue boxes, readouts</td><td>stb_truetype or a BMFont loader; text layout by hand</td><td><code>fontdue</code>, <code>glyphon</code></td><td>Medium</td></tr>
+        <tr><td><code>Music</code>, <code>Sound</code> (OpenAL)</td><td>Clip audio, music, sound cues synced to cinematics</td><td>miniaudio or SDL3_mixer</td><td><code>kira</code> or <code>rodio</code></td><td>Small–medium</td></tr>
+        <tr><td><code>Matrix4</code>, <code>Vector2</code>, <code>MathUtils</code>, JOML</td><td>Transforms, view rotation</td><td>cglm, or GLM in C++</td><td><code>glam</code></td><td>Small</td></tr>
+        <tr><td><code>JsonReader</code>, <code>JsonValue</code></td><td>Scene files (HOCON-like)</td><td>cJSON plus a custom parser for the scene syntax</td><td><code>serde</code> + a custom parser</td><td>Small</td></tr>
+        <tr><td><code>OrthographicCamera</code>, <code>FitViewport</code></td><td>1920×1080 virtual canvas, letterboxing</td><td>~100 lines of math</td><td>~100 lines</td><td>Small</td></tr>
+        <tr><td>Gradle + fat jar</td><td>Build, run tasks, packaging</td><td>CMake + scripts</td><td>Cargo (handles this well)</td><td>Small</td></tr>
+      </tbody></table></div>
+      <p><strong>Things outside libGDX that also have to be rebuilt:</strong></p>
+      <ul class="plain">
+        <li><strong>The test suite</strong>, 5,425 lines of <code>kotlin.test</code>. Rust has built-in testing; C needs a framework such as Unity or Criterion; C++ has GoogleTest or Catch2.</li>
+        <li><strong>Hot-reloading and the TUNING screen.</strong> TUNING edits <code>GameConfig.kt</code>&#x27;s 1,249 lines of tunables as text. A native port should move tunables to a data file (TOML or similar) loaded at runtime, which is better anyway.</li>
+        <li><strong>The </strong><strong><code>aiDiagrams</code></strong><strong> tool</strong>, which parses Kotlin with the Kotlin compiler. It would need a rewrite against the new language&#x27;s parser (Rust: <code>syn</code>; C/C++: libclang), or the state machine would move to data that&#x27;s drawn directly.</li>
+        <li><strong>Behavior-tree port binding</strong> built on Kotlin reflection becomes macros (Rust) or code generation (C/C++).</li>
+      </ul>
+      <p><strong>What gets easier:</strong> distribution. Today a Steam build needs a bundled JRE (40–80 MB via <code>jlink</code>/<code>jpackage</code>) and <code>-XstartOnFirstThread</code> on macOS. A native build is one executable of a few MB plus assets.</p>
+      <p><strong>What you&#x27;d lose for good:</strong> libGDX&#x27;s path to Android, iOS and the web, if you ever wanted it. SDL3 and wgpu cover those too, though with more work.</p>
+    </section>
+    <section id="how-much-faster-it-would-actually-be">
+      <h2>How much faster it would actually be</h2>
+      <p><strong>Expect 1.2–2× on CPU simulation, 0× on GPU effects, and big wins only in startup, memory and download size.</strong> These are estimates from typical JVM-vs-native results on similar code, not measurements of this game. The benchmark in the last section would replace them with real numbers.</p>
+      <div class="table-wrap"><table>
+      <thead><tr><th>What</th><th>JVM today (estimate)</th><th>Native C/C++/Rust (estimate)</th><th>Would a player notice?</th></tr></thead>
+      <tbody>
+        <tr><td>Tight loops over primitive arrays (particles, vapor, physics)</td><td>Within ~1.0–1.5× of C after JIT warm-up</td><td>Baseline; more SIMD when written for it</td><td>Only at scales far past today&#x27;s</td></tr>
+        <tr><td>Object-heavy code (AI, lists of entities, small allocations)</td><td>Boxing, headers and GC cost ~1.5–3×</td><td>Baseline</td><td>Only with hundreds of AI ships</td></tr>
+        <tr><td>GPU work (bloom, glow, screen effects, fill)</td><td>~11 ms worst case at 3584×1982</td><td>Same</td><td>No</td></tr>
+        <tr><td>GC pauses</td><td>Sub-millisecond with ZGC; tens of ms possible with default G1 under load</td><td>None</td><td>Rarely, as an occasional hitch</td></tr>
+        <tr><td>First-frame startup</td><td>~0.5–2 s (JVM boot, class loading, JIT warm-up)</td><td>~0.1 s</td><td>Slightly, at launch</td></tr>
+        <tr><td>Memory</td><td>~200–500 MB resident</td><td>~30–100 MB</td><td>No, on a gaming PC</td></tr>
+        <tr><td>Download</td><td>JRE + jar, ~60–100 MB before assets</td><td>~5–15 MB before assets</td><td>Minor</td></tr>
+      </tbody></table></div>
+      <p><strong>Where native code really pulls ahead</strong> is deliberate data-oriented and SIMD work: processing 4–8 particles per instruction, packing entity data into cache lines, and controlling memory layout precisely. That can mean 4–10× on specific hot loops. It isn&#x27;t automatic, though. It needs code written for it, and the JVM&#x27;s Vector API (incubating in Java 21) can do some of it in Kotlin too.</p>
+      <p><strong>The honest frame:</strong> today&#x27;s 8-ship dogfight probably uses a small slice of one CPU core for simulation. Making that slice 2× smaller changes nothing a player can see. Native speed matters only once you push scale by 10–100×, and at that point the algorithm fixes in the hot-spot table matter more than the language.</p>
+    </section>
+    <section id="what-extra-cycles-could-buy">
+      <h2>What extra cycles could buy</h2>
+      <p><strong>The ideas that best fit the vision (BSG-scale dogfights, supersonic weapons, 16-bit spectacle) are all reachable, and most come from the GPU or better algorithms, not from leaving Kotlin.</strong> Sorted by how well each fits the design pillars in <code>notes.txt</code>:</p>
+      <div class="table-wrap"><table>
+      <thead><tr><th>Idea</th><th>What it adds</th><th>Where the cycles come from</th><th>Doable in Kotlin?</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Fleet battles:</strong> 50–300 ships, with wingmen, capital ships and flak</td><td>The BSG feel: a dogfight inside a larger battle</td><td>Spatial-grid collision and sensing; GPU-drawn ships</td><td>Yes; native helps past a few hundred AI ships</td></tr>
+        <tr><td><strong>Dense particles:</strong> 100k+ sparks, debris, smoke, and every hull breaking into its macro-pixels</td><td>Spectacle that stays readable in cells</td><td>GPU instancing or compute-style particles</td><td>Yes; the GPU does the work</td></tr>
+        <tr><td><strong>Live smoke and vapor:</strong> a fluid sim on the macro-pixel grid, pushed by engines and explosions</td><td>Trails that curl and react to ships passing through</td><td>GPU shader (issue #18 already plans vapor on the GPU)</td><td>Yes</td></tr>
+        <tr><td><strong>Smarter AI:</strong> short-horizon lookahead, simulating a few seconds ahead to pick a maneuver</td><td>Enemies that set traps and fight in pairs</td><td>CPU per ship: the one place native speed helps directly</td><td>Yes for a few ships; native for many</td></tr>
+        <tr><td><strong>More physics per ship:</strong> per-part damage, thrust from damaged engines, debris that collides</td><td>Hits that change how a ship flies</td><td>CPU, mostly algorithmic</td><td>Yes</td></tr>
+        <tr><td><strong>Instant replays and kill-cams:</strong> re-run a seeded session from its inputs</td><td>Shareable highlights; easier bug reports</td><td>Already possible: <code>World</code> seeds every random draw</td><td>Yes; needs fully deterministic floats (easier natively)</td></tr>
+        <tr><td><strong>Lockstep or rollback netcode for co-op</strong></td><td>Multiplayer wingmen</td><td>Deterministic sim, re-simulating several ticks per frame</td><td>Possible; native makes cross-machine determinism easier</td></tr>
+        <tr><td><strong>Higher sim rate (240 Hz) or lower input latency</strong></td><td>Even crisper control</td><td>CPU per tick</td><td>Yes at today&#x27;s scale</td></tr>
+        <tr><td><strong>Richer screen effects:</strong> CRT curvature, phosphor persistence, lighting from explosions onto hulls</td><td>Stronger 80s–90s look</td><td>GPU</td><td>Yes; same speed either way</td></tr>
+      </tbody></table></div>
+      <p><strong>Two ideas are where native code truly earns its place:</strong> lots of AI ships thinking with lookahead every tick, and deterministic multiplayer. Both are post-demo features. Both are better served by a Rust rewrite of <em>the simulation core only</em> than by porting the whole game.</p>
+    </section>
+    <section id="risks-and-what-would-be-lost">
+      <h2>Risks, and what would be lost</h2>
+      <p><strong>The biggest risk isn&#x27;t a missing feature. It&#x27;s the tuned feel drifting during the port without anyone noticing.</strong> Months of tuning live in exact numbers and orderings (&quot;Jesse&#x27;s tuning: enemies take 9 hits once morale breaks&quot;).</p>
+      <div class="table-wrap"><table>
+      <thead><tr><th>Risk</th><th>How it shows up</th><th>Likelihood</th><th>Mitigation</th></tr></thead>
+      <tbody>
+        <tr><td>Feel drift</td><td>Flight, turn limits, greyout or weapon feel subtly changes; playtesting says &quot;something&#x27;s off&quot; with no lead</td><td>High</td><td>Golden replays: record seeded sessions in Kotlin, require the port to match them tick for tick</td></tr>
+        <tr><td>Silent memory bugs (C/C++)</td><td>Rare crashes, corrupted state that reads as bad tuning</td><td>High in C, medium in C++, low in Rust</td><td>Use Rust; or sanitizers (ASan/UBSan) in every CI run</td></tr>
+        <tr><td>Next Fest slips</td><td>Port eats the four months before Feb 22, 2027</td><td>High if started now</td><td>Don&#x27;t start before the fest</td></tr>
+        <tr><td>Lost tooling</td><td><code>aiDiagrams</code>, TUNING, <code>shipFrames</code>, <code>btPalette</code>, scene editor regress or vanish</td><td>Medium</td><td>Port tools in the same phase as the systems they serve</td></tr>
+        <tr><td>Two codebases at once</td><td>Fixes land in one but not the other during the port</td><td>High in an incremental port</td><td>Freeze Kotlin features during the port, or port behind golden tests</td></tr>
+        <tr><td>Floating-point differences</td><td>Kotlin&#x27;s <code>Math.sin</code> vs C&#x27;s <code>sinf</code> differ in the last bits; replays diverge after minutes</td><td>Certain, small</td><td>Compare with tolerances, or ship your own sin/cos for determinism</td></tr>
+        <tr><td>You lose the ability to read the code</td><td>Kotlin was the language you could step into</td><td>Certain</td><td>Accept it; lean on tests and replays</td></tr>
+      </tbody></table></div>
+      <p><strong>Functionality that would be lost outright:</strong> none of the game&#x27;s features. You&#x27;d lose libGDX&#x27;s Android/iOS/web backends (unused today), Kotlin compiler-based tooling (rebuildable), and the JVM&#x27;s crash stack traces with line numbers, which Rust panics keep but C segfaults don&#x27;t.</p>
+    </section>
+    <section id="how-a-migration-would-go-if-the-numbers">
+      <h2>How a migration would go, if the numbers call for it</h2>
+      <p><strong>Port incrementally, simulation first, with golden replays as the referee. Don&#x27;t do a big-bang rewrite.</strong> Each phase ships a playable game, and each gate is a measurement, not a feeling.</p>
+      <figure class="roadmap-fig">
+      <svg class="roadmap" viewBox="0 0 760 340" role="img" aria-label="Migration roadmap: four phases, each step waiting on a measurement" font-size="11.5">
+      <defs><marker id="road-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--muted)"/></marker></defs>
+      <text x="24" y="30" font-size="15" font-weight="700" fill="var(--fg)">Each step toward native code waits on a measurement</text>
+      <text x="24" y="52" fill="var(--muted)">Phases left to right, not to scale. Efforts are estimates for agent-written code plus playtesting.</text>
+      <line x1="24" y1="244" x2="712" y2="244" stroke="var(--muted)" stroke-width="1.25" marker-end="url(#road-arrow)"/>
+      <rect x="24" y="76" width="163" height="136" rx="8" fill="var(--accent)" fill-opacity="0.12" stroke="var(--accent)" stroke-width="2"/>
+      <text x="36" y="100" font-size="13" font-weight="700" fill="var(--accent)">0. Optimize Kotlin</text>
+      <text x="36" y="118" fill="var(--muted)">Now, through Next Fest</text>
+      <text x="36" y="142" fill="var(--fg)">simBench baseline</text>
+      <text x="36" y="158" fill="var(--fg)">Grid collision, sensing</text>
+      <text x="36" y="174" fill="var(--fg)">GPU cells and vapor</text>
+      <text x="36" y="190" fill="var(--fg)">Golden replays</text>
+      <rect x="199" y="76" width="163" height="136" rx="8" fill="none" fill-opacity="1" stroke="var(--muted)" stroke-width="1.25"/>
+      <text x="211" y="100" font-size="13" font-weight="700" fill="var(--fg)">1. Rust spike</text>
+      <text x="211" y="118" fill="var(--muted)">About 1 to 2 weeks</text>
+      <text x="211" y="142" fill="var(--fg)">Particles + collision</text>
+      <text x="211" y="158" fill="var(--fg)">as a Rust library</text>
+      <text x="211" y="174" fill="var(--fg)">called from Kotlin (FFM)</text>
+      <text x="211" y="190" fill="var(--fg)">Benched side by side</text>
+      <rect x="374" y="76" width="163" height="136" rx="8" fill="none" fill-opacity="1" stroke="var(--muted)" stroke-width="1.25"/>
+      <text x="386" y="100" font-size="13" font-weight="700" fill="var(--fg)">2. Sim core in Rust</text>
+      <text x="386" y="118" fill="var(--muted)">About 4 to 6 weeks</text>
+      <text x="386" y="142" fill="var(--fg)">Physics, AI, weapons</text>
+      <text x="386" y="158" fill="var(--fg)">Kotlin keeps rendering,</text>
+      <text x="386" y="174" fill="var(--fg)">cinema, tools, menus</text>
+      <text x="386" y="190" fill="var(--fg)">Replays must match</text>
+      <rect x="549" y="76" width="163" height="136" rx="8" fill="none" fill-opacity="1" stroke="var(--muted)" stroke-width="1.25"/>
+      <text x="561" y="100" font-size="13" font-weight="700" fill="var(--fg)">3. Full native</text>
+      <text x="561" y="118" fill="var(--muted)">Optional, 6 to 10 weeks</text>
+      <text x="561" y="142" fill="var(--fg)">SDL3 + wgpu renderer</text>
+      <text x="561" y="158" fill="var(--fg)">Effects, cinema, tools</text>
+      <text x="561" y="174" fill="var(--fg)">Kotlin retired</text>
+      <text x="561" y="190" fill="var(--fg)">One small binary</text>
+      <line x1="193.0" y1="212" x2="193.0" y2="235" stroke="var(--muted)" stroke-dasharray="3 3"/>
+      <polygon points="184.0,244 193.0,235 202.0,244 193.0,253" fill="var(--accent-2)" fill-opacity="0.35" stroke="var(--accent-2)" stroke-width="1.25"/>
+      <text x="193.0" y="274" text-anchor="middle" font-weight="700" fill="var(--fg)">After the fest:</text>
+      <text x="193.0" y="290" text-anchor="middle" fill="var(--muted)">a tick still over 8.3 ms</text>
+      <text x="193.0" y="306" text-anchor="middle" fill="var(--muted)">at the target scale</text>
+      <line x1="368.0" y1="212" x2="368.0" y2="235" stroke="var(--muted)" stroke-dasharray="3 3"/>
+      <polygon points="359.0,244 368.0,235 377.0,244 368.0,253" fill="var(--accent-2)" fill-opacity="0.35" stroke="var(--accent-2)" stroke-width="1.25"/>
+      <text x="368.0" y="274" text-anchor="middle" font-weight="700" fill="var(--fg)">Spike pays off:</text>
+      <text x="368.0" y="290" text-anchor="middle" fill="var(--muted)">2x or more faster</text>
+      <text x="368.0" y="306" text-anchor="middle" fill="var(--muted)">and replays match</text>
+      <line x1="543.0" y1="212" x2="543.0" y2="235" stroke="var(--muted)" stroke-dasharray="3 3"/>
+      <polygon points="534.0,244 543.0,235 552.0,244 543.0,253" fill="var(--accent-2)" fill-opacity="0.35" stroke="var(--accent-2)" stroke-width="1.25"/>
+      <text x="543.0" y="274" text-anchor="middle" font-weight="700" fill="var(--fg)">Only if needed:</text>
+      <text x="543.0" y="290" text-anchor="middle" fill="var(--muted)">rendering or shipping</text>
+      <text x="543.0" y="306" text-anchor="middle" fill="var(--muted)">also needs native</text>
+      </svg>
+      
+      <figcaption>Migration roadmap: 4 phases, 3 gates.</figcaption>
+      </figure>
+      <p><strong>Why incremental beats big-bang here.</strong> A full rewrite in one go is roughly 8–14 weeks of agent work with no playable build until the end. Then every difference in feel surfaces at once, with no way to tell which subsystem caused it. Porting the simulation behind a stable boundary lets you playtest after every step and stop at whichever phase is enough.</p>
+      <p><strong>How to verify a port when nobody reads the code:</strong></p>
+      <ol class="beats">
+        <li><strong>Golden replays.</strong> Record seeded sessions with their inputs in Kotlin. The port must reproduce ship positions, hits and deaths within a small tolerance, tick for tick. This is the one test that protects feel.</li>
+        <li><strong>Port the tests first.</strong> The 5,425 lines of existing tests become the spec. The new code isn&#x27;t done until they pass.</li>
+        <li><strong>Side-by-side builds.</strong> Keep the Kotlin build runnable during the port so a playtest can switch between them on the same seed.</li>
+        <li><strong>Sanitizers or Rust&#x27;s checks in CI.</strong> In Rust, ban <code>unsafe</code> outside the FFI boundary. In C/C++, run every test under AddressSanitizer and UndefinedBehaviorSanitizer.</li>
+      </ol>
+      <p><strong>What about Phase 3?</strong> It&#x27;s worth doing only if the Kotlin side becomes the problem: renderer CPU cost, the JRE in the Steam download, or startup time. Nothing today suggests it will.</p>
+    </section>
+    <section id="the-cheaper-path-get-the-cycles-in-kotli">
+      <h2>The cheaper path: get the cycles in Kotlin first</h2>
+      <p><strong>Most of the headroom a port promises is available in days, not months, without changing language.</strong> Roughly in order of payoff per effort:</p>
+      <ol class="beats">
+        <li><strong>Measure the CPU.</strong> Add a <code>-PsimBench</code> mode beside <code>-PfxBench</code>: spawn 10, 50, 100 and 300 enemies with a fixed seed and log ms per tick for AI, physics, collision, effects and drawing. Run JDK Flight Recorder or async-profiler once to see allocations. <em>Effort: 1–2 days.</em></li>
+        <li><strong>Spatial grid for collision and sensing.</strong> Replaces the n(n−1)/2 pair loop. At 300 ships this cuts pair tests from 44,850 to a few thousand. <em>1–2 days.</em></li>
+        <li><strong>Draw effect cells on the GPU.</strong> Upload particle positions, colors and sizes once a frame and let an instanced shader draw the cells, instead of thousands of <code>ShapeRenderer.rect</code> calls. <em>2–4 days.</em></li>
+        <li><strong>Vapor grid on the GPU</strong> (issue #18, already planned). <em>2–4 days.</em></li>
+        <li><strong>Switch to ZGC</strong> (<code>-XX:+UseZGC -XX:+ZGenerational</code>) and remove the remaining per-tick allocations. Pauses drop below 1 ms. <em>Half a day.</em></li>
+        <li><strong>Upgrade the stack:</strong> Kotlin 1.9.22 → 2.x (the K2 compiler builds faster), libGDX 1.11 → 1.13, gdx-vfx to its matching release. <em>1–2 days, plus re-checking effects.</em></li>
+        <li><strong>Package with </strong><strong><code>jpackage</code></strong> and a trimmed <code>jlink</code> runtime for Steam: one launcher per OS, no Java install for players. <em>1 day.</em></li>
+      </ol>
+      <p><strong>If the benchmark later shows a CPU wall</strong>, there&#x27;s a middle path before a full port: move only the simulation core (physics, collision, AI stepping) into a Rust library and call it from Kotlin through JNI or Java 21&#x27;s Foreign Function API. The renderer, cinema, tools and menus stay in Kotlin. This is how many JVM projects adopt native speed, and it keeps most of the game&#x27;s code and tooling.</p>
+    </section>
+    <section id="recommendation-and-next-steps">
+      <h2>Recommendation and next steps</h2>
+      <p><strong>Stay on Kotlin through Next Fest, measure the CPU, and decide on native code from numbers after the fest.</strong> If native wins, choose Rust and port the simulation core first. Don&#x27;t choose C.</p>
+      <ul class="checks">
+        <li><span class="box">☐</span> Add <code>-PsimBench</code> (enemy counts 10/50/100/300, ms per tick by subsystem) and record a baseline</li>
+        <li><span class="box">☐</span> Write down the scale target: how many ships, particles and AI agents the post-fest game should handle</li>
+        <li><span class="box">☐</span> Spatial grid for collision and sensing</li>
+        <li><span class="box">☐</span> GPU-instanced effect cells and vapor grid (issue #18)</li>
+        <li><span class="box">☐</span> ZGC and <code>jpackage</code> for the Steam build</li>
+        <li><span class="box">☐</span> Start recording golden replays of seeded sessions now. They protect tuning during any refactor, port or not</li>
+        <li><span class="box">☐</span> After Next Fest: rerun <code>-PsimBench</code> at the target scale. If a tick can&#x27;t fit in 8.3 ms after the fixes above, start the Rust spike</li>
+      </ul>
+      <p><strong>Open questions:</strong></p>
+      <ul class="plain">
+        <li>What scale do you actually want? &quot;BSG fleet battle&quot; with hundreds of ships points toward native; a tight 8–20 ship dogfight doesn&#x27;t.</li>
+        <li>Do you want multiplayer someday? Deterministic lockstep or rollback netcode is the strongest single argument for a native simulation core.</li>
+        <li>How much does reading the code yourself still matter? If you never want to step in, Kotlin&#x27;s readability advantage counts for less.</li>
+      </ul>
+    </section>
+  </main>
+
+  <footer><a href="./">← Back to Jet's Wiki</a></footer>
+</body>
+</html>

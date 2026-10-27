@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Enemy AI · Jet's Wiki</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Creepster&family=Nunito:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="leaves" aria-hidden="true">
+    <span>🍂</span><span>🍁</span><span>🍂</span><span>🦇</span><span>🍁</span><span>🍂</span><span>🍁</span>
+  </div>
+
+  <header>
+    <p class="crumbs"><a href="./">Jet's Wiki</a> / Defender X</p>
+    <h1 class="page-title">Enemy AI: How It Works and What Changes</h1>
+    <p class="tagline">Defender X &middot; Jesse Paine &middot; 18 Oct 2026</p>
+    <nav>
+      <a href="#overview">Overview</a>
+      <a href="#glossary">Glossary</a>
+      <a href="#today">How enemies behave today</a>
+      <a href="#problems">Problems</a>
+      <a href="#plan">Plan</a>
+    </nav>
+  </header>
+
+  <main class="article">
+    <section id="overview">
+      <h2>Overview</h2>
+      <p>Every enemy ship is flown by the same three-part "pilot": one part notices things, one part decides what to do, and one part works the controls. This split stays. What changes is the detail inside each part, based on what play-testing shows.</p>
+      <p>Think of it as a fighter pilot's head:</p>
+      <ol class="beats">
+        <li><strong>Sensing: what the pilot notices.</strong> 120 times a second, each enemy takes stock of the world. Is the player on radar? Close enough to see? Am I in the player's gunsight? Am I about to hit a rock? It doesn't act on any of this. It just writes down a short list of facts.</li>
+        <li><strong>Deciding: what the pilot is trying to do.</strong> The decision part reads those facts and picks one current goal, such as "chase the player", "line up a strafing run", or "run away". It switches goals only when the facts give it a reason to.</li>
+        <li><strong>Acting: how the pilot flies.</strong> Each goal has a matching flying routine that presses the ship's controls: turn left, turn right, thrust, fire. Enemies press the same keys the player does, so they obey exactly the same physics. They can't cheat.</li>
+      </ol>
+      <figure class="diagram">
+        <pre class="mermaid">
+flowchart LR
+    W[Game world] --> S["Sensing<br/>writes percepts"]
+    S --> D["Deciding<br/>picks a state"]
+    D --> A["Acting<br/>presses virtual keys"]
+    A --> W
+        </pre>
+        <figcaption>The three parts of every enemy's pilot.</figcaption>
+      </figure>
+      <p>The loop closes through the game world: the keys an enemy presses move its ship, which changes what it notices on the next tick.</p>
+      <p>Two ideas sit on top of this and stay as they are:</p>
+      <ul class="plain">
+        <li><strong>Morale.</strong> Each enemy has nerve. Every time the player catches it squarely in their sights and fires (a "zero"), its nerve drops. With nerve gone, its morale breaks and it stops attacking.</li>
+        <li><strong>Brave and cowardly enemies.</strong> What a broken enemy does depends on its personality. A <em>quitter</em> (cowardly) runs, and once cornered flies straight and accepts its fate. A <em>fighter</em> (brave) turns around for one last stand.</li>
+      </ul>
+      <p>The guiding rule from the original design also stays: enemies should make the <em>cinematic</em> choice over the <em>realistic</em> one. A dramatic swoop away the instant the player fires beats a cleverer but duller move.</p>
+      <p>This doc doesn't assume you've read the original AI notes (ai-notes.md). The glossary below covers the terms.</p>
+    </section>
+
+    <section id="glossary">
+      <h2>Glossary</h2>
+      <p>The terms below come up in this doc and in the code. They're in reading order, not alphabetical.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Term</th><th>What it means here</th></tr></thead>
+          <tbody>
+            <tr><td>Tick</td><td>One step of the game's clock. The game runs 120 ticks a second. Timings in the code are counted in ticks (240 ticks = 2 seconds).</td></tr>
+            <tr><td>Percepts</td><td>The short list of facts the sensing part writes down each tick, such as "player on radar" or "I'm in their sights". Deciding and acting read only this list, never the raw game world.</td></tr>
+            <tr><td>State</td><td>One thing an enemy can be doing, like <em>patrolling</em> or <em>strafing run</em>. An enemy is in exactly one state at a time.</td></tr>
+            <tr><td>Transition</td><td>A rule for leaving a state: "if <em>this</em> fact becomes true, switch to <em>that</em> state". Example: while closing in, if the player comes into view, switch to engaging.</td></tr>
+            <tr><td>State machine (FSM)</td><td>A set of states plus the transitions between them. Like a flowchart the enemy is always standing on one box of, stepping along an arrow when its condition comes true.</td></tr>
+            <tr><td>Hierarchical state machine (HSM, or HFSM)</td><td>A state machine with states nested inside bigger states, like folders. "Strafing run" sits inside "engaging", inside "on the offensive", inside "morale high". A rule on an outer state covers everything inside it. One rule, "morale broke → switch to morale low", pulls the enemy out of any attacking state, without repeating that rule on each one. <strong>This is what the deciding part uses.</strong></td></tr>
+            <tr><td>Behavior tree (BT)</td><td>A different way to organize AI: a tree of small steps ("turn toward target", "if lined up, fire") read top to bottom every tick, trying alternatives until one works. Good for long, step-by-step routines with fallbacks. The original plan used BTs for the acting part. They turned out to be so short that plain code was simpler, so the game has none today.</td></tr>
+            <tr><td>HSM vs BT</td><td>An HSM is good at <em>what am I doing, and when do I stop?</em> (modes and switches). A BT is good at <em>how do I do it, step by step?</em> (sequences and fallbacks). Defender X uses an HSM to decide and plain code to act.</td></tr>
+            <tr><td>Leaf state</td><td>A state with nothing nested inside it. Only leaf states fly the ship; each one has its own flying routine.</td></tr>
+            <tr><td>Behavior</td><td>The flying routine for one leaf state, for example <em>strafe run</em>: turn onto the player, thrust when lined up, fire in bursts.</td></tr>
+            <tr><td>Virtual keys</td><td>The enemy's "keyboard": the same turn, thrust and fire controls the player has. Behaviors press and release them.</td></tr>
+            <tr><td>Interrupt</td><td>A state that can cut in over everything else. Here, <em>avoiding obstacle</em> takes over the controls when a crash is predicted, then hands back to whatever the enemy was doing.</td></tr>
+            <tr><td>Blackboard</td><td>A small notepad each enemy keeps: timers and choices that last across ticks, like which side it's flanking on or how long a strafing run has left.</td></tr>
+            <tr><td>Nose cone</td><td>A narrow wedge (about 5°) straight ahead of the player's ship, out to about one screen's distance. An enemy inside it is "in the player's sights".</td></tr>
+            <tr><td>Zero</td><td>The player firing while an enemy is in their nose cone. It counts as one hit to morale; a burst counts once.</td></tr>
+            <tr><td>Nerve</td><td>How many zeroes an enemy takes before its morale breaks. Default 3.</td></tr>
+            <tr><td>Morale high / low</td><td>The top-level split. High: the enemy attacks. Low: it retreats, and what happens when it's caught depends on personality.</td></tr>
+            <tr><td>Fighter / quitter</td><td>The two personalities. Fighters (brave) turn for a last stand when caught, react twice as fast (12 ticks vs 24) and turn faster. Quitters (cowardly) fly straight and accept their fate.</td></tr>
+            <tr><td>Reaction delay</td><td>Enemies see the player where they were a moment ago (12 or 24 ticks), so a sharp juke fools them. Reflexes, like noticing they're in the sights, stay instant.</td></tr>
+            <tr><td>Dwell time</td><td>The minimum a leaf state is held (30 ticks) before its own transitions can fire, to stop flickering between states. Urgent states, like <em>evading</em>, skip it.</td></tr>
+            <tr><td>Perception faults</td><td>Deliberate mistakes in sensing: <em>dizzy</em> after spinning hard (the player's position swims), <em>fixated</em> (ignores threats from behind while watching the player), <em>distracted</em> (loses the player for a while after dodging a rock).</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="today">
+      <h2>How enemies behave today</h2>
+      <p>Today an enemy has nine flying states in two halves: an attacking half while morale is high, and a retreating half once it breaks. A crash-avoidance interrupt sits over both. This is the code on <code>main</code> as of 2026-10-18 (<code>src/main/kotlin/defenderx/ai/</code>).</p>
+
+      <h3>A typical fight, start to finish</h3>
+      <ol class="beats">
+        <li><strong>Patrolling</strong> (see <a href="#problems">Problems</a> below for why this sort of behavior needs to go). The enemy cruises between random points near where it spawned.</li>
+        <li><strong>Closing distance.</strong> The player appears on radar (within 6,000 units, a few screens away). The enemy heads for where the player is going to be, at full speed.</li>
+        <li><strong>Engaging.</strong> The player comes into view (1,500 units, about a screen ahead of the enemy's nose). The enemy now loops through a three-step attack:
+          <ol class="beats">
+            <li><em>Holding standoff:</em> hang back off to one side of the player, out of their guns, for a random time.</li>
+            <li><em>Strafing run:</em> turn in, thrust when lined up, fire in bursts.</li>
+            <li><em>Breaking off:</em> when it gets too close or the run times out, burn away across the player's path, then back to standoff.</li>
+          </ol>
+        </li>
+        <li><strong>Evading.</strong> Whenever the enemy finds itself in the player's sights, it drops everything. It flies straight until the player fires, then swoops away on the afterburner. This is the cinematic beat: the dramatic dodge.</li>
+        <li><strong>Morale breaks.</strong> Each zero costs one point of nerve. At zero nerve, whatever it was doing, it switches to the retreating half:
+          <ul class="plain">
+            <li><em>Gaining distance:</em> runs straight away from the player. Fighters first get a short booster burst the player can't match.</li>
+            <li><em>Caught, quitter:</em> if the player gets it in their sights from behind, it flies straight at full thrust and waits for the end.</li>
+            <li><em>Caught, fighter:</em> from any angle, it turns to face the player and fires until one of them dies. It stops dodging the player too.</li>
+          </ul>
+        </li>
+        <li><strong>Lost.</strong> If the player has been off radar for 2 seconds, either half goes back to patrolling (as with patrolling, see <a href="#problems">Problems</a> for why we are dropping this).</li>
+      </ol>
+      <p>At any point, a predicted crash into a rock or another ship hands the controls to <strong>avoiding obstacle</strong>. The enemy swerves around it, or turns tail and burns to kill its speed if it's charging a rock head-on. Then it resumes what it was doing. Afterward it sometimes loses track of the player for a while (distracted).</p>
+
+      <figure class="diagram">
+        <pre class="mermaid">
+stateDiagram-v2
+    [*] --> Patrolling
+    Patrolling --> MoraleHigh: player on radar
+    state "Morale high" as MoraleHigh {
+        state "On offensive" as OnOffensive {
+            state "Closing distance" as ClosingDistance
+            ClosingDistance --> Engaging: player in view
+            ClosingDistance --> Evading: in player's sights
+            state Engaging {
+                state "Holding standoff" as HoldingStandoff
+                state "Strafing run" as StrafingRun
+                state "Breaking off" as BreakingOff
+                HoldingStandoff --> StrafingRun: timer out
+                StrafingRun --> BreakingOff: too close / timer out
+                BreakingOff --> HoldingStandoff: timer out
+            }
+            Engaging --> Evading: in player's sights
+            Evading --> ClosingDistance: out of sights, swoop done
+        }
+    }
+    MoraleHigh --> MoraleLow: morale broke
+    state "Morale low" as MoraleLow {
+        state "On retreat" as OnRetreat {
+            state "Gaining distance" as GainingDistance
+            state "Evading low (quitter)" as EvadingLow
+            GainingDistance --> EvadingLow: caught (quitter)
+        }
+        state "Last stand (fighter)" as LastStand
+        OnRetreat --> LastStand: caught (fighter)
+    }
+    MoraleHigh --> Patrolling: player lost 2 s
+    MoraleLow --> Patrolling: player lost 2 s
+        </pre>
+        <figcaption>The enemy state map today: nested states and what switches them. Not drawn: avoiding obstacle can interrupt any state; losing view of the player sends engaging back to closing distance; a last stand ends only if the player is lost.</figcaption>
+      </figure>
+
+      <h3>Every state</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>State</th><th>Sits inside</th><th>What the enemy does</th><th>Leaves when</th></tr></thead>
+          <tbody>
+            <tr><td>Patrolling</td><td>Morale high (or low)</td><td>Cruises between random points near its spawn</td><td>Player on radar</td></tr>
+            <tr><td>Closing distance</td><td>On offensive</td><td>Heads for where the player will be, full speed</td><td>Player in view → engaging; in their sights → evading</td></tr>
+            <tr><td>Holding standoff</td><td>Engaging</td><td>Hangs back to one side, doesn't fire</td><td>Its random timer runs out → strafing run</td></tr>
+            <tr><td>Strafing run</td><td>Engaging</td><td>Turns onto the player, thrusts and fires in bursts</td><td>Too close, or timer out → breaking off</td></tr>
+            <tr><td>Breaking off</td><td>Engaging</td><td>Burns away across the player's line</td><td>Timer out → holding standoff</td></tr>
+            <tr><td>Evading</td><td>On offensive</td><td>Flies straight; swoops away the instant the player fires</td><td>Out of their sights and swoop done → closing distance</td></tr>
+            <tr><td>Gaining distance</td><td>On retreat</td><td>Runs straight away (fighters boost first)</td><td>Caught → its personality's end state</td></tr>
+            <tr><td>Evading low (quitter)</td><td>On retreat</td><td>Flies straight, accepts its fate</td><td>Never, unless it loses the player</td></tr>
+            <tr><td>Last stand (fighter)</td><td>Morale low</td><td>Turns on the player and fires, won't swerve from them</td><td>Loses the player → patrolling</td></tr>
+            <tr><td>Avoiding obstacle</td><td>Over everything</td><td>Swerves around, or turns and brakes</td><td>Path clear for a moment → back to what it was doing</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>The outer states (morale high, on offensive, engaging, morale low, on retreat) don't fly the ship. They hold the rules shared by everything inside them, such as "morale broke → leave" and "lost the player → patrol".</p>
+    </section>
+
+    <section id="problems">
+      <h2>Problems</h2>
+      <p>To come from Jesse's play-testing: what the setup above actually leads to in a fight. Comment on any state, row or step above and it lands here as a problem.</p>
+      <p><strong>Fights aren't cinematic as a whole.</strong> Apart from any one enemy's faults, nothing shapes the fight above the single pilot. Each enemy runs its own loop, so no one paces the threat into build, peak and relief, or picks the moment for a swoop across the nose, a shot just off the bow or a wingman's radio call. That gap is what the <a href="level-conductor.html">Level Conductor</a> is for: a new major pillar of the AI system that watches the level as it plays and changes or adds its key events.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Problem</th><th>Seen in play</th><th>States involved</th></tr></thead>
+          <tbody>
+            <tr><td>no engagement by enemy</td><td>yes</td><td>any time the enemy is on screen there is a very high chance of entering the player's nose cone which switches the enemy state to evading. Very little fighting happens unless there are swarms of enemies so the player is surrounded.</td></tr>
+            <tr><td>enemy doesn't boost away</td><td>yes</td><td>I'm only assuming this is an AI thing, when an enemy decides to flee they turn and fly away but then kill their engine. It makes sense since the newtonian mechanics means you don't need the engine on once you hit top speed, but it means there's no vapor trail for the player to follow.</td></tr>
+            <tr><td>enemy is erratic</td><td>yes</td><td>This is very hand wavey, but the enemy seems to flip about for no reason during play and I'm sure this is due to the simple way I plotted out decision trees and states. There's no locking in of decisions or strategies, so every time a new percept comes in the enemy acts on it immediately and looks twitchy</td></tr>
+            <tr><td>etc...</td><td>yes</td><td>There are more, but this should get us started for now. We're also overhauling the basic gameplay with the turn and burn maneuver and near misses being central. The enemy AI will have to be reconsidered from the ground up in accordance with this.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Reworking the AI for the new turn-and-burn and near-miss gameplay is its own discussion: Enemy AI: Rework for the New Gameplay.</p>
+    </section>
+
+    <section id="plan">
+      <h2>Plan</h2>
+      <p>The plan is a short loop: play, write down problems, agree on changes, build them, then review a diagram of what changed. The diagrams are drawn from the code by a program, so they're never out of date and nobody has to draw them by hand.</p>
+      <h3>What stays</h3>
+      <ul class="plain">
+        <li>The three parts: sensing, deciding, acting.</li>
+        <li>Morale and nerve, and brave (fighter) vs cowardly (quitter) enemies.</li>
+        <li>Cinematic over realistic: the dramatic choice wins.</li>
+        <li>Enemies fly with the same keys and physics as the player.</li>
+      </ul>
+      <h3>The loop</h3>
+      <ol class="beats">
+        <li>Jesse play-tests and comments on the sections above.</li>
+        <li>Each comment becomes a row in Problems.</li>
+        <li>Claude proposes a change for each problem, in this section, for Jesse to approve.</li>
+        <li>Claude builds the approved changes on their own branch.</li>
+        <li>The build draws fresh diagrams, with what changed against <code>main</code> highlighted: new arrows, removed arrows, changed conditions.</li>
+        <li>Jesse plays the branch, checks the diagrams, and the loop starts again.</li>
+      </ol>
+      <p>It only runs one way: code → diagram. Editing a diagram doesn't change the game.</p>
+      <h3>Diagrams</h3>
+      <p>How the diagrams get made, and the options we weighed, now live in Enemy AI: Automated Diagrams.</p>
+      <h3>Changes</h3>
+      <p>Proposed changes come here once the Problems are in, one per problem, each with its before/after diagram.</p>
+    </section>
+  </main>
+
+  <footer><a href="./">← Back to Jet's Wiki</a></footer>
+
+  <script type="module">
+    import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.esm.min.mjs";
+    const dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: "base",
+      fontFamily: "Nunito, system-ui, sans-serif",
+      themeVariables: dark
+        ? { background: "#221733", primaryColor: "#2d1f42", primaryTextColor: "#f6e9d7", primaryBorderColor: "#fb923c", lineColor: "#c9b29a", secondaryColor: "#1f1430", tertiaryColor: "#1f1430", edgeLabelBackground: "#221733" }
+        : { background: "#fffaf2", primaryColor: "#fdebd3", primaryTextColor: "#2b1a10", primaryBorderColor: "#c2410c", lineColor: "#6b4a33", secondaryColor: "#f3e2c7", tertiaryColor: "#f3e2c7", edgeLabelBackground: "#fffaf2" }
+    });
+  </script>
+</body>
+</html>
