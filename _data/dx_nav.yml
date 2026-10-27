@@ -1,0 +1,24 @@
+# Sidebar for the Defender X sub-wiki. Order here is the order in the sidebar.
+# `children` are sub-articles, shown indented under their parent.
+- title: Start here
+  url: /defender-x/
+- title: Mission statement
+  url: /defender-x/mission.html
+- title: Camera and coordinates
+  url: /defender-x/camera.html
+  children:
+    - title: Zoom and moving camera (planned)
+      url: /defender-x/camera-zoom.html
+- title: Physics and g-forces
+  url: /defender-x/physics.html
+- title: Rendering layers
+  url: /defender-x/rendering.html
+- title: AI layers
+  url: /defender-x/ai.html
+  children:
+    - title: Every enemy state
+      url: /defender-x/ai-states.html
+- title: Level Conductor
+  url: /defender-x/conductor.html
+- title: Cinema engine
+  url: /defender-x/cinema.html

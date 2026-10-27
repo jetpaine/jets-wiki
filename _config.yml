@@ -1,0 +1,10 @@
+title: Jet's Wiki
+baseurl: /jets-wiki
+markdown: kramdown
+kramdown:
+  input: GFM
+  hard_wrap: false
+  auto_ids: true
+  footnote_backlink: "↩"
+exclude:
+  - README.md
