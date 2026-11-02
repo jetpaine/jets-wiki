@@ -1,0 +1,135 @@
+Defender X enemy AI behavior trees, from defender-x main at 1fb8dd9 (1 Nov 2026)
+[A] action   [C] condition   [SubTree] calls another tree   other nodes are controls and decorators
+Ports follow a node's name as key=value; {name} is a blackboard key.
+
+FollowingOrders  (following_orders.xml)
+
+ReactiveFallback
+|-- ReactiveSequence "follow"
+|   |-- [A] OrderHeading  heading={heading}
+|   |-- [A] ReleaseAllKeys
+|   |-- [A] TurnToBearing  heading={heading} bearing={turnBearing}
+|   `-- [A] Thrust
+`-- ForceFailure "noOrder"
+    `-- [A] ReleaseAllKeys
+
+
+Closing  (closing.xml)
+
+ReactiveFallback
+|-- ReactiveSequence "close"
+|   |-- [A] HeadingToTarget  heading={heading}
+|   |-- [A] ReleaseAllKeys
+|   |-- [A] TurnToBearing  heading={heading} bearing={turnBearing}
+|   `-- [A] Thrust
+`-- ForceFailure "noTarget"
+    `-- [A] ReleaseAllKeys
+
+
+Engaging  (engaging.xml)
+
+ReactiveFallback
+|-- ReactiveSequence "engage"
+|   |-- Fallback "contact"
+|   |   |-- [C] HasVisual
+|   |   `-- [C] HasRadarContact
+|   |-- [C] HasTarget
+|   |-- [A] ReleaseAllKeys
+|   `-- ReactiveFallback
+|       |-- ReactiveSequence "knifeFight"
+|       |   |-- [C] InRange  range=800
+|       |   |-- [A] AimAndFire  bearing={aimBearing}
+|       |   `-- Sequence "maneuvers"
+|       |       |-- [A] EngineKill  seconds=1.0
+|       |       |-- [A] Pivot  degrees=25 seconds=0.5
+|       |       |-- [A] EngineKill  seconds=0.6
+|       |       |-- [A] Pivot  degrees=25 seconds=0.5
+|       |       `-- [A] Thrust  seconds=0.6
+|       `-- ReactiveSequence "closeIn"
+|           |-- [A] HeadingToTarget  heading={heading}
+|           |-- [A] TurnToBearing  heading={heading} bearing={turnBearing}
+|           `-- [A] Thrust
+`-- ForceFailure "noTarget"
+    `-- [A] ReleaseAllKeys
+
+
+Fleeing  (fleeing.xml)
+
+ReactiveFallback
+|-- ReactiveSequence "flee"
+|   |-- [A] HeadingAwayFromTarget  heading={heading}
+|   |-- [A] ReleaseAllKeys
+|   |-- [A] Breakaway
+|   |-- [A] Reverse  heading={heading}
+|   |-- [A] Thrust
+|   `-- [A] TurnToBearing  heading={heading} bearing={turnBearing}
+`-- ForceFailure "noTarget"
+    `-- [A] ReleaseAllKeys
+
+
+FinalStand  (final_stand.xml)
+
+Sequence
+|-- ForceSuccess
+|   `-- Sequence "runThenTurn"
+|       |-- ReactiveFallback "run"
+|       |   |-- [C] InRange
+|       |   `-- Repeat  num_cycles=-1
+|       |       `-- [SubTree] Fleeing
+|       `-- ReactiveSequence "starbuck"
+|           |-- [C] HasTarget
+|           |-- [A] ReleaseAllKeys
+|           |-- [A] AimAndFire  bearing={aimBearing}
+|           `-- [A] EngineKill  seconds=2.5
+`-- [SubTree] Engaging
+
+
+EvadingObstacle  (evading.xml)
+
+[A] AvoidObstacle
+
+
+EvadingEnemy  (evading.xml)
+
+[A] TurnAndBurn
+
+
+The per-state evading trees  (evading.xml)
+
+ClosingEvadingObstacle
+[SubTree] EvadingObstacle
+
+ClosingEvadingEnemy
+[SubTree] EvadingEnemy
+
+EngagingEvadingObstacle
+[SubTree] EvadingObstacle
+
+EngagingEvadingEnemy
+[SubTree] EvadingEnemy
+
+FleeingEvadingObstacle
+[SubTree] EvadingObstacle
+
+FleeingEvadingEnemy
+[SubTree] EvadingEnemy
+
+FinalStandEvadingObstacle
+[SubTree] EvadingObstacle
+
+FinalStandEvadingEnemy
+[SubTree] EvadingEnemy
+
+
+StrafeRun  (strafe_run.xml)
+
+ReactiveFallback
+|-- ReactiveSequence "pass"
+|   |-- [C] HasTarget
+|   |-- [A] AimAndFire  bearing={aimBearing}
+|   |-- [A] ThrustWithin  bearing={aimBearing}
+|   |-- [A] KeysOff  keys=stabilize,afterburner,booster
+|   `-- [A] CountDownPhase
+`-- ForceFailure "noTarget"
+    `-- [A] ReleaseAllKeys
+(Not flown in play: a test reference.)
