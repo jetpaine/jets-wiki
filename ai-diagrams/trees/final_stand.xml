@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  FinalStand (final_stand): a flee-then-stand enemy that has shaken off its
+  pursuer turns back to fight to the end (the Enemy AI doc, "Trees with no
+  draft yet"): a Starbuck 180 on a dead engine to try for a zero, then
+  regular engaging, reusing the Engaging tree as a subtree.
+
+  - run: it keeps fleeing, engine burning (the Fleeing tree), until the
+    pursuer has caught up to gun range (ENEMY_FIRE_RANGE). A pursuer that
+    never catches up never gets the stand. Fleeing reports SUCCESS once
+    lined up on its way out, so a Repeat keeps it going.
+  - starbuck: then it kills the engine, and AimAndFire swings the nose
+    round onto the pursuer's lead and fires bursts while it coasts on
+    backward, for 2.5 s. No restart inside the move, so no reverse boost
+    and no shield drop there.
+  - then Engaging, for as long as the stand lasts. Its first burn after
+    the dead-engine swing is a restart, so it lights the reverse boost
+    and drops the shield, as for any pilot.
+  Each time the state is entered (after an evasion, say) it starts over.
+  The 180's length is a first guess, tuned here.
+-->
+<root BTCPP_format="4" main_tree_to_execute="FinalStand">
+  <BehaviorTree ID="FinalStand">
+    <Sequence>
+      <ForceSuccess>
+        <Sequence name="runThenTurn">
+          <ReactiveFallback name="run">
+            <InRange/>
+            <Repeat num_cycles="-1">
+              <SubTree ID="Fleeing"/>
+            </Repeat>
+          </ReactiveFallback>
+          <ReactiveSequence name="starbuck">
+            <HasTarget/>
+            <ReleaseAllKeys/>
+            <AimAndFire bearing="{aimBearing}"/>
+            <EngineKill seconds="2.5"/>
+          </ReactiveSequence>
+        </Sequence>
+      </ForceSuccess>
+      <SubTree ID="Engaging"/>
+    </Sequence>
+  </BehaviorTree>
+</root>

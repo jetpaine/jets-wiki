@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  FollowingOrders (following_orders): no contact, but an order. Turn onto
+  the order's heading and burn along it (the Enemy AI doc's draft, "Trees
+  with no draft yet"). The stand-in conductor re-aims the heading at the
+  player every few seconds, so an enemy that loses contact keeps coming.
+
+  Every tick it first lets go of everything, then presses only what this
+  tick needs: the turn always, the engine once the nose is within
+  AI_THRUST_CONE of the heading. With no order it lets go and fails.
+-->
+<root BTCPP_format="4" main_tree_to_execute="FollowingOrders">
+  <BehaviorTree ID="FollowingOrders">
+    <ReactiveFallback>
+      <ReactiveSequence name="follow">
+        <OrderHeading heading="{heading}"/>
+        <ReleaseAllKeys/>
+        <TurnToBearing heading="{heading}" bearing="{turnBearing}"/>
+        <Thrust/>
+      </ReactiveSequence>
+      <ForceFailure name="noOrder">
+        <ReleaseAllKeys/>
+      </ForceFailure>
+    </ReactiveFallback>
+  </BehaviorTree>
+</root>

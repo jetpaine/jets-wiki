@@ -1,0 +1,923 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Enemy AI Diagrams · Jet's Wiki</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Creepster&family=Nunito:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="leaves" aria-hidden="true">
+    <span>🍂</span><span>🍁</span><span>🍂</span><span>🦇</span><span>🍁</span><span>🍂</span><span>🍁</span>
+  </div>
+
+  <header>
+    <p class="crumbs"><a href="./">Jet's Wiki</a> / Defender X</p>
+    <h1 class="page-title">Enemy AI Diagrams</h1>
+    <p class="tagline">Defender X &middot; drawn from <code>main</code> at 1fb8dd9 (1 Nov 2026)</p>
+    <nav>
+      <a href="#decision">Decision layer (HSM)</a>
+      <a href="#hsm-json">HSM as JSON</a>
+      <a href="#acting">Acting layer (behavior trees)</a>
+      <a href="#files">Files</a>
+    </nav>
+  </header>
+
+  <main class="article">
+    <section id="intro">
+      <p class="lede">Every enemy pilot decides with a hierarchical state machine (HSM) and acts with behavior trees. These are the latest diagrams of both, drawn from the game's code and tree files, not by hand.</p>
+      <ul class="plain">
+        <li><strong>Decision layer:</strong> 16 states and 29 arrows, read from <code>ai/decision</code> by <code>./gradlew aiDiagrams</code>. Shown as the Graphviz diagram the task draws, and as the JSON model it's drawn from.</li>
+        <li><strong>Acting layer:</strong> the Groot2 tree files in <code>assets/ai/trees</code>, redrawn here as Groot2-style trees, since Groot2 itself only runs as a desktop app.</li>
+      </ul>
+    </section>
+
+    <section id="decision">
+      <h2>Decision layer: the state machine</h2>
+      <p>Each box is a state. A box with a border around other states is a <strong>superstate</strong>: <code>morale_good</code> and <code>morale_broken</code> only hold rules, and a <strong>●</strong> marks where each one starts, with the conditions for each starting state. Each <strong>arrow</strong> is a switch, labelled with every condition on the way to it (all must hold). The second line in a state's box is the tree it flies. Hover a state for its notes and the facts its rules read.</p>
+      <div class="gv-scroll"><svg class="gv" width="2134" height="576"
+ viewBox="0.00 0.00 2134.00 576.00" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+<g id="graph0" class="graph" transform="scale(1 1) rotate(0) translate(4 571.6)">
+<title>hsm</title>
+<polygon fill="white" stroke="none" points="-4,4 -4,-571.6 2129.62,-571.6 2129.62,4 -4,4"/>
+<text xml:space="preserve" text-anchor="start" x="993.78" y="-553.8" font-family="Helvetica,sans-Serif" font-weight="bold" font-size="12.00">Enemy AI state machine</text>
+<text xml:space="preserve" text-anchor="start" x="697.39" y="-544.5" font-family="Helvetica,sans-Serif" font-size="9.00">Drawn from ai/decision by ./gradlew aiDiagrams. Boxes with a border are superstates; ● marks where one starts. Dashed: an interrupt. Hover a state for its notes and the facts it reads.</text>
+<g id="clust1" class="cluster">
+<title>cluster_MoraleGood</title>
+<g id="a_clust1"><a xlink:title="Where an enemy follows orders, closes and engages. Damage moves the two fleeing morale types to [MoraleBroken], for good.&#10;&#10;Reads: p.damageTaken, p.haveOrders, p.haveVisual, p.moraleType, p.radarSignature">
+<path fill="none" stroke="#888888" d="M20,-237.8C20,-237.8 1072,-237.8 1072,-237.8 1078,-237.8 1084,-243.8 1084,-249.8 1084,-249.8 1084,-518.6 1084,-518.6 1084,-524.6 1078,-530.6 1072,-530.6 1072,-530.6 20,-530.6 20,-530.6 14,-530.6 8,-524.6 8,-518.6 8,-518.6 8,-249.8 8,-249.8 8,-243.8 14,-237.8 20,-237.8"/>
+<text xml:space="preserve" text-anchor="start" x="508.33" y="-516.8" font-family="Helvetica,sans-Serif" font-weight="bold" font-size="12.00">morale_good</text>
+</a>
+</g>
+</g>
+<g id="clust2" class="cluster">
+<title>cluster_Closing</title>
+<g id="a_clust2"><a xlink:title="The target on radar but not in sight: head for where it&#39;s going to be.&#10;&#10;Reads: p.onCrashCourse, p.underFire">
+<path fill="none" stroke="#888888" d="M140,-245.8C140,-245.8 586,-245.8 586,-245.8 592,-245.8 598,-251.8 598,-257.8 598,-257.8 598,-433.2 598,-433.2 598,-439.2 592,-445.2 586,-445.2 586,-445.2 140,-445.2 140,-445.2 134,-445.2 128,-439.2 128,-433.2 128,-433.2 128,-257.8 128,-257.8 128,-251.8 134,-245.8 140,-245.8"/>
+<text xml:space="preserve" text-anchor="start" x="342" y="-431.4" font-family="Helvetica,sans-Serif" font-weight="bold" font-size="12.00">closing</text>
+</a>
+</g>
+</g>
+<g id="clust3" class="cluster">
+<title>cluster_Engaging</title>
+<g id="a_clust3"><a xlink:title="The target in sight: the Engaging tree (the Enemy AI doc&#39;s draft). Turn to face the target and burn; once close, engine kills, small pivots and pot shots. Each time in, its aim error starts fresh; leaving ends any burst. Being in the target&#39;s sights doesn&#39;t send it evading; only being under fire does.&#10;&#10;Reads: p.onCrashCourse, p.underFire">
+<path fill="none" stroke="#888888" d="M618,-245.8C618,-245.8 1064,-245.8 1064,-245.8 1070,-245.8 1076,-251.8 1076,-257.8 1076,-257.8 1076,-433.2 1076,-433.2 1076,-439.2 1070,-445.2 1064,-445.2 1064,-445.2 618,-445.2 618,-445.2 612,-445.2 606,-439.2 606,-433.2 606,-433.2 606,-257.8 606,-257.8 606,-251.8 612,-245.8 618,-245.8"/>
+<text xml:space="preserve" text-anchor="start" x="814.33" y="-431.4" font-family="Helvetica,sans-Serif" font-weight="bold" font-size="12.00">engaging</text>
+</a>
+</g>
+</g>
+<g id="clust4" class="cluster">
+<title>cluster_MoraleBroken</title>
+<g id="a_clust4"><a xlink:title="Morale broken: it runs, and never recovers.&#10;&#10;Reads: p.haveVisual, p.lostPursuer, p.moraleType, p.radarSignature">
+<path fill="none" stroke="#888888" d="M1104,-8C1104,-8 2044,-8 2044,-8 2050,-8 2056,-14 2056,-20 2056,-20 2056,-418.8 2056,-418.8 2056,-424.8 2050,-430.8 2044,-430.8 2044,-430.8 1104,-430.8 1104,-430.8 1098,-430.8 1092,-424.8 1092,-418.8 1092,-418.8 1092,-20 1092,-20 1092,-14 1098,-8 1104,-8"/>
+<text xml:space="preserve" text-anchor="start" x="1530.98" y="-417" font-family="Helvetica,sans-Serif" font-weight="bold" font-size="12.00">morale_broken</text>
+</a>
+</g>
+</g>
+<g id="clust5" class="cluster">
+<title>cluster_Fleeing</title>
+<g id="a_clust5"><a xlink:title="Run from the target, engines burning; a flee&#45;then&#45;stand enemy that has lost its pursuer turns back.&#10;&#10;Reads: p.lostPursuer, p.moraleType, p.onCrashCourse, p.underFire">
+<path fill="none" stroke="#888888" d="M1112,-120.8C1112,-120.8 1558,-120.8 1558,-120.8 1564,-120.8 1570,-126.8 1570,-132.8 1570,-132.8 1570,-308.2 1570,-308.2 1570,-314.2 1564,-320.2 1558,-320.2 1558,-320.2 1112,-320.2 1112,-320.2 1106,-320.2 1100,-314.2 1100,-308.2 1100,-308.2 1100,-132.8 1100,-132.8 1100,-126.8 1106,-120.8 1112,-120.8"/>
+<text xml:space="preserve" text-anchor="start" x="1315.66" y="-306.4" font-family="Helvetica,sans-Serif" font-weight="bold" font-size="12.00">fleeing</text>
+</a>
+</g>
+</g>
+<g id="clust6" class="cluster">
+<title>cluster_FinalStand</title>
+<g id="a_clust6"><a xlink:title="Having shaken off its pursuer, it turns back to fight to the end: the FinalStand tree, a Starbuck 180 on a dead engine and then Engaging.&#10;&#10;Reads: p.onCrashCourse, p.underFire">
+<path fill="none" stroke="#888888" d="M1590,-16C1590,-16 2036,-16 2036,-16 2042,-16 2048,-22 2048,-28 2048,-28 2048,-183.2 2048,-183.2 2048,-189.2 2042,-195.2 2036,-195.2 2036,-195.2 1590,-195.2 1590,-195.2 1584,-195.2 1578,-189.2 1578,-183.2 1578,-183.2 1578,-28 1578,-28 1578,-22 1584,-16 1590,-16"/>
+<text xml:space="preserve" text-anchor="start" x="1781.33" y="-181.4" font-family="Helvetica,sans-Serif" font-weight="bold" font-size="12.00">final_stand</text>
+</a>
+</g>
+</g>
+<!-- MoraleGood__init -->
+<g id="node1" class="node">
+<title>MoraleGood__init</title>
+<g id="a_node1"><a xlink:title="morale_good starts here">
+<ellipse fill="#333333" stroke="#555555" cx="555" cy="-496.6" rx="3.6" ry="3.6"/>
+</a>
+</g>
+</g>
+<!-- FollowingOrders -->
+<g id="node2" class="node">
+<title>FollowingOrders</title>
+<g id="a_node2"><a xlink:title="No contact, but an order: fly its heading (the stand&#45;in conductor re&#45;aims it at the player).">
+<path fill="white" stroke="#555555" d="M108.31,-414.8C108.31,-414.8 27.69,-414.8 27.69,-414.8 21.69,-414.8 15.69,-408.8 15.69,-402.8 15.69,-402.8 15.69,-390.8 15.69,-390.8 15.69,-384.8 21.69,-378.8 27.69,-378.8 27.69,-378.8 108.31,-378.8 108.31,-378.8 114.31,-378.8 120.31,-384.8 120.31,-390.8 120.31,-390.8 120.31,-402.8 120.31,-402.8 120.31,-408.8 114.31,-414.8 108.31,-414.8"/>
+<text xml:space="preserve" text-anchor="start" x="23.69" y="-397.9" font-family="Helvetica,sans-Serif" font-weight="bold" font-size="11.00">following_orders</text>
+<text xml:space="preserve" text-anchor="start" x="24.98" y="-388.7" font-family="Helvetica,sans-Serif" font-size="9.00" fill="#555555">tree: FollowingOrders</text>
+</a>
+</g>
+</g>
+<!-- MoraleGood__init&#45;&gt;FollowingOrders -->
+<g id="edge5" class="edge">
+<title>MoraleGood__init&#45;&gt;FollowingOrders</title>
+<path fill="none" stroke="#444444" d="M551.38,-495.59C515.89,-495.42 229.44,-493.18 150,-464 126.04,-455.2 103.85,-436.34 88.61,-420.99"/>
+<polygon fill="#444444" stroke="#444444" points="90.6,-419.52 83.97,-416.18 87.07,-422.92 90.6,-419.52"/>
+<text xml:space="preserve" text-anchor="middle" x="237.54" y="-501.15" font-family="Helvetica,sans-Serif" font-size="9.00" fill="#333333">!p.haveVisual &amp;&amp; !p.radarSignature &amp;&amp;</text>
+<text xml:space="preserve" text-anchor="middle" x="237.54" y="-490.35" font-family="Helvetica,sans-Serif" font-size="9.00" fill="#333333"> &#160;p.haveOrders</text>
+</g>
+<!-- MoraleGood__init&#45;&gt;FollowingOrders -->
+<g id="edge8" class="edge">
+<title>MoraleGood__init&#45;&gt;FollowingOrders</title>
+<path fill="none" stroke="#888888" d="M551.16,-495.29C510.85,-491.98 165.64,-463.27 124,-445.2 111.16,-439.63 99.02,-430.1 89.35,-421.04"/>
+<polygon fill="#888888" stroke="#888888" points="91.17,-419.4 84.45,-416.26 87.75,-422.91 91.17,-419.4"/>
+<text xml:space="preserve" text-anchor="middle" x="296" y="-455.9" font-family="Helvetica,sans-Serif" font-size="9.00" fill="#333333">!p.haveVisual &amp;&amp; !p.radarSignature</text>
+</g>
+<!-- Closing__self -->
+<g id="node3" class="node">
+<title>Closing__self</title>
+<g id="a_node3"><a xlink:title="The target on radar but not in sight: head for where it&#39;s going to be.&#10;&#10;Reads: p.onCrashCourse, p.underFire">
+<path fill="white" stroke="#555555" d="M462.26,-414.8C462.26,-414.8 419.74,-414.8 419.74,-414.8 413.74,-414.8 407.74,-408.8 407.74,-402.8 407.74,-402.8 407.74,-390.8 407.74,-390.8 407.74,-384.8 413.74,-378.8 419.74,-378.8 419.74,-378.8 462.26,-378.8 462.26,-378.8 468.26,-378.8 474.26,-384.8 474.26,-390.8 474.26,-390.8 474.26,-402.8 474.26,-402.8 474.26,-408.8 468.26,-414.8 462.26,-414.8"/>
+<text xml:space="preserve" text-anchor="start" x="421.75" y="-397.9" font-family="Helvetica,sans-Serif" font-weight="bold" font-size="11.00">closing</text>
+<text xml:space="preserve" text-anchor="start" x="415.74" y="-388.7" font-family="Helvetica,sans-Serif" font-size="9.00" fill="#555555">tree: Closing</text>
+</a>
+</g>
+</g>
+<!-- MoraleGood__init&#45;&gt;Closing__self -->
+<g id="edge3" class="edge">
+<title>MoraleGood__init&#45;&gt;Closing__self</title>
+<path fill="none" stroke="#444444" d="M551.27,-495.64C536.66,-495.56 482.83,-493.25 456,-464 446.07,-453.17 442.25,-437.19 440.95,-423.64"/>
+<polygon fill="#444444" stroke="#444444" points="443.4,-423.51 440.51,-416.67 438.51,-423.81 443.4,-423.51"/>
+<text xml:space="preserve" text-anchor="middle" x="414.96" y="-485.72" font-family="Helvetica,sans-Serif" font-size="9.00" fill="#333333">!p.haveVisual &amp;&amp; p.radarSignature</text>
+</g>
+<!-- MoraleGood__init&#45;&gt;Closing__self -->
+<g id="edge7" class="edge">
+<title>MoraleGood__init&#45;&gt;Closing__self</title>
+<path fill="none" stroke="#888888" d="M552.62,-493.56C541.86,-484.33 497.02,-445.86 467.55,-420.58"/>
+<polygon fill="#888888" stroke="#888888" points="469.2,-418.77 462.3,-416.07 466.01,-422.49 469.2,-418.77"/>
+<text xml:space="preserve" text-anchor="middle" x="551.65" y="-455.9" font-family="Helvetica,sans-Serif" font-size="9.00" fill="#333333">p.radarSignature</text>
+</g>
+<!-- Engaging__self -->
+<g id="node6" class="node">
+<title>Engaging__self</title>
+<g id="a_node6"><a xlink:title="The target in sight: the Engaging tree (the Enemy AI doc&#39;s draft). Turn to face the target and burn; once close, engine kills, small pivots and pot shots. Each time in, its aim error starts fresh; leaving ends any burst. Being in the target&#39;s sights doesn&#39;t send it evading; only being under fire does.&#10;&#10;Reads: p.onCrashCourse, p.underFire">
+<path fill="white" stroke="#555555" d="M752.27,-414.8C752.27,-414.8 701.73,-414.8 701.73,-414.8 695.73,-414.8 689.73,-408.8 689.73,-402.8 689.73,-402.8 689.73,-390.8 689.73,-390.8 689.73,-384.8 695.73,-378.8 701.73,-378.8 701.73,-378.8 752.27,-378.8 752.27,-378.8 758.27,-378.8 764.27,-384.8 764.27,-390.8 764.27,-390.8 764.27,-402.8 764.27,-402.8 764.27,-408.8 758.27,-414.8 752.27,-414.8"/>
+<text xml:space="preserve" text-anchor="start" x="702.56" y="-397.9" font-family="Helvetica,sans-Serif" font-weight="bold" font-size="11.00">engaging</text>
+<text xml:space="preserve" text-anchor="start" x="697.73" y="-388.7" font-family="Helvetica,sans-Serif" font-size="9.00" fill="#555555">tree: Engaging</text>
+</a>
+</g>
+</g>
+<!-- MoraleGood__init&#45;&gt;Engaging__self -->
+<g id="edge4" class="edge">
+<title>MoraleGood__init&#45;&gt;Engaging__self</title>
+<path fill="none" stroke="#444444" d="M557.99,-493.9C573.32,-485.18 644.29,-444.83 689.25,-419.26"/>
+<polygon fill="#444444" stroke="#444444" points="690.31,-421.48 695.19,-415.89 687.89,-417.22 690.31,-421.48"/>
+<text xml:space="preserve" text-anchor="middle" x="614.48" y="-446.35" font-family="Helvetica,sans-Serif" font-size="9.00" fill="#333333">p.haveVisual</text>
+</g>
+<!-- MoraleGood__init&#45;&gt;Engaging__self -->
+<g id="edge6" class="edge">
+<title>MoraleGood__init&#45;&gt;Engaging__self</title>
+<path fill="none" stroke="#888888" d="M558.3,-494.51C569.08,-490.88 604.15,-478.63 631,-464 654.59,-451.15 679.52,-433.83 698.06,-420.13"/>
+<polygon fill="#888888" stroke="#888888" points="699.23,-422.32 703.38,-416.17 696.3,-418.39 699.23,-422.32"/>
+<text xml:space="preserve" text-anchor="middle" x="673.27" y="-455.9" font-family="Helvetica,sans-Serif" font-size="9.00" fill="#333333">p.haveVisual</text>
+</g>
+<!-- MoraleBroken__init -->
+<g id="node9" class="node">
+<title>MoraleBroken__init</title>
+<g id="a_node9"><a xlink:title="morale_broken starts here">
+<ellipse fill="#333333" stroke="#555555" cx="1519" cy="-396.8" rx="3.6" ry="3.6"/>
+</a>
+</g>
+</g>
+<!-- MoraleGood__init&#45;&gt;MoraleBroken__init -->
+<g id="edge2" class="edge">
+<title>MoraleGood__init&#45;&gt;MoraleBroken__init</title>
+<path fill="none" stroke="#444444" d="M1084,-445.61C1085.33,-445.47 1086.67,-445.34 1088,-445.2 1129.46,-440.96 1173.15,-436.34 1216.16,-431.69"/>
+<polygon fill="#444444" stroke="#444444" points="1216.27,-434.15 1222.97,-430.96 1215.74,-429.28 1216.27,-434.15"/>
+<text xml:space="preserve" text-anchor="middle" x="1080.35" y="-451.83" font-family="Helvetica,sans-Serif" font-size="9.00" fill="#333333">p.damageTaken &amp;&amp; p.moraleType !=</text>
+<text xml:space="preserve" text-anchor="middle" x="1080.35" y="-441.03" font-family="Helvetica,sans-Serif" font-size="9.00" fill="#333333"> &#160;MoraleType.FIGHTS_TO_DEATH</text>
+</g>
+<!-- NoState -->
+<g id="node16" class="node">
+<title>NoState</title>
+<g id="a_node16"><a xlink:title="Out of the machine (the JSON&#39;s &quot;to&quot;: null): no contact and nothing to do. It lets go of its keys, and World despawns it once it&#39;s off screen.">
+<path fill="white" stroke="#555555" d="M2113.62,-289.8C2113.62,-289.8 2076.38,-289.8 2076.38,-289.8 2070.38,-289.8 2064.38,-283.8 2064.38,-277.8 2064.38,-277.8 2064.38,-265.8 2064.38,-265.8 2064.38,-259.8 2070.38,-253.8 2076.38,-253.8 2076.38,-253.8 2113.62,-253.8 2113.62,-253.8 2119.62,-253.8 2125.62,-259.8 2125.62,-265.8 2125.62,-265.8 2125.62,-277.8 2125.62,-277.8 2125.62,-283.8 2119.62,-289.8 2113.62,-289.8"/>
+<text xml:space="preserve" text-anchor="start" x="2072.38" y="-272.9" font-family="Helvetica,sans-Serif" font-weight="bold" font-size="11.00">no_state</text>
+<text xml:space="preserve" text-anchor="start" x="2082.74" y="-263.7" font-family="Helvetica,sans-Serif" font-size="9.00" fill="#555555">LetGo</text>
+</a>
+</g>
+</g>
+<!-- MoraleGood__init&#45;&gt;NoState -->
+<g id="edge1" class="edge">
+<title>MoraleGood__init&#45;&gt;NoState</title>
+<path fill="none" stroke="#444444" d="M1084,-493.37C1503.05,-489.17 2024.31,-477.43 2062,-445.2 2104.31,-409.02 2103.04,-336.68 2098.84,-298.22"/>
+<polygon fill="#444444" stroke="#444444" points="2101.31,-298.26 2098.04,-291.6 2096.45,-298.85 2101.31,-298.26"/>
+<text xml:space="preserve" text-anchor="middle" x="1638.47" y="-493.3" font-family="Helvetica,sans-Serif" font-size="9.00" fill="#333333">!p.haveVisual &amp;&amp; !p.radarSignature &amp;&amp;</text>
+<text xml:space="preserve" text-anchor="middle" x="1638.47" y="-482.5" font-family="Helvetica,sans-Serif" font-size="9.00" fill="#333333"> &#160;!p.haveOrders</text>
+</g>
+<!-- ClosingEvadingObstacle -->
+<g id="node4" class="node">
+<title>ClosingEvadingObstacle</title>
+<g id="a_node4"><a xlink:title="Reads: p.onCrashCourse">
+<path fill="white" stroke="#555555" d="M330.94,-289.8C330.94,-289.8 205.06,-289.8 205.06,-289.8 199.06,-289.8 193.06,-283.8 193.06,-277.8 193.06,-277.8 193.06,-265.8 193.06,-265.8 193.06,-259.8 199.06,-253.8 205.06,-253.8 205.06,-253.8 330.94,-253.8 330.94,-253.8 336.94,-253.8 342.94,-259.8 342.94,-265.8 342.94,-265.8 342.94,-277.8 342.94,-277.8 342.94,-283.8 336.94,-289.8 330.94,-289.8"/>
+<text xml:space="preserve" text-anchor="start" x="201.06" y="-272.9" font-family="Helvetica,sans-Serif" font-weight="bold" font-size="11.00">closing.evading_obstacle</text>
+<text xml:space="preserve" text-anchor="start" x="208.72" y="-263.7" font-family="Helvetica,sans-Serif" font-size="9.00" fill="#555555">tree: ClosingEvadingObstacle</text>
+</a>
+</g>
+</g>
+<!-- Closing__self&#45;&gt;ClosingEvadingObstacle -->
+<g id="edge9" class="edge">
+<title>Closing__self&#45;&gt;ClosingEvadingObstacle</title>
+<path fill="none" stroke="#444444" d="M407.28,-379.81C406.18,-379.45 405.09,-379.11 404,-378.8 355.64,-364.92 212.68,-387.59 179.46,-349.8 161.11,-328.93 187.47,-308.43 216.09,-293.84"/>
+<polygon fill="#444444" stroke="#444444" points="216.83,-296.21 222.03,-290.93 214.67,-291.81 216.83,-296.21"/>
+<text xml:space="preserve" text-anchor="middle" x="214.73" y="-336.3" font-family="Helvetica,sans-Serif" font-size="9.00" fill="#333333">p.onCrashCourse</text>
+</g>
+<!-- ClosingEvadingEnemy -->
+<g id="node5" class="node">
+<title>ClosingEvadingEnemy</title>
+<g id="a_node5"><a xlink:title="Reads: p.underFire">
+<path fill="white" stroke="#555555" d="M538.05,-289.8C538.05,-289.8 421.95,-289.8 421.95,-289.8 415.95,-289.8 409.95,-283.8 409.95,-277.8 409.95,-277.8 409.95,-265.8 409.95,-265.8 409.95,-259.8 415.95,-253.8 421.95,-253.8 421.95,-253.8 538.05,-253.8 538.05,-253.8 544.05,-253.8 550.05,-259.8 550.05,-265.8 550.05,-265.8 550.05,-277.8 550.05,-277.8 550.05,-283.8 544.05,-289.8 538.05,-289.8"/>
+<text xml:space="preserve" text-anchor="start" x="417.95" y="-272.9" font-family="Helvetica,sans-Serif" font-weight="bold" font-size="11.00">closing.evading_enemy</text>
+<text xml:space="preserve" text-anchor="start" x="424.47" y="-263.7" font-family="Helvetica,sans-Serif" font-size="9.00" fill="#555555">tree: ClosingEvadingEnemy</text>
+</a>
+</g>
+</g>
+<!-- Closing__self&#45;&gt;ClosingEvadingEnemy -->
+<g id="edge10" class="edge">
+<title>Closing__self&#45;&gt;ClosingEvadingEnemy</title>
+<path fill="none" stroke="#444444" d="M434.62,-378.34C430.52,-364.38 426.99,-344.51 432.98,-328.2 437.36,-316.27 445.57,-305.15 453.93,-296.05"/>
+<polygon fill="#444444" stroke="#444444" points="455.53,-297.91 458.64,-291.17 452.01,-294.51 455.53,-297.91"/>
+<text xml:space="preserve" text-anchor="middle" x="455.99" y="-336.3" font-family="Helvetica,sans-Serif" font-size="9.00" fill="#333333">p.underFire</text>
+</g>
+<!-- ClosingEvadingObstacle&#45;&gt;Closing__self -->
+<g id="edge11" class="edge">
+<title>ClosingEvadingObstacle&#45;&gt;Closing__self</title>
+<path fill="none" stroke="#444444" d="M282.21,-290.11C296.69,-306.94 320.44,-332.43 344.96,-349.8 350.02,-353.38 376.09,-365.81 399.8,-376.85"/>
+<polygon fill="#444444" stroke="#444444" points="398.63,-379.01 406.01,-379.74 400.69,-374.57 398.63,-379.01"/>
+<text xml:space="preserve" text-anchor="middle" x="381.48" y="-336.3" font-family="Helvetica,sans-Serif" font-size="9.00" fill="#333333">!p.onCrashCourse</text>
+</g>
+<!-- ClosingEvadingEnemy&#45;&gt;Closing__self -->
+<g id="edge12" class="edge">
+<title>ClosingEvadingEnemy&#45;&gt;Closing__self</title>
+<path fill="none" stroke="#444444" d="M486.04,-290.01C490.66,-306.09 495.01,-330.45 487,-349.8 483.49,-358.27 477.59,-365.99 471.15,-372.59"/>
+<polygon fill="#444444" stroke="#444444" points="469.62,-370.67 466.25,-377.28 473,-374.21 469.62,-370.67"/>
+<text xml:space="preserve" text-anchor="middle" x="515.58" y="-336.3" font-family="Helvetica,sans-Serif" font-size="9.00" fill="#333333">!p.underFire</text>
+</g>
+<!-- EngagingEvadingObstacle -->
+<g id="node7" class="node">
+<title>EngagingEvadingObstacle</title>
+<g id="a_node7"><a xlink:title="Reads: p.onCrashCourse">
+<path fill="white" stroke="#555555" d="M809.13,-289.8C809.13,-289.8 672.87,-289.8 672.87,-289.8 666.87,-289.8 660.87,-283.8 660.87,-277.8 660.87,-277.8 660.87,-265.8 660.87,-265.8 660.87,-259.8 666.87,-253.8 672.87,-253.8 672.87,-253.8 809.13,-253.8 809.13,-253.8 815.13,-253.8 821.13,-259.8 821.13,-265.8 821.13,-265.8 821.13,-277.8 821.13,-277.8 821.13,-283.8 815.13,-289.8 809.13,-289.8"/>
+<text xml:space="preserve" text-anchor="start" x="668.87" y="-272.9" font-family="Helvetica,sans-Serif" font-weight="bold" font-size="11.00">engaging.evading_obstacle</text>
+<text xml:space="preserve" text-anchor="start" x="677.71" y="-263.7" font-family="Helvetica,sans-Serif" font-size="9.00" fill="#555555">tree: EngagingEvadingObstacle</text>
+</a>
+</g>
+</g>
+<!-- Engaging__self&#45;&gt;EngagingEvadingObstacle -->
+<g id="edge13" class="edge">
+<title>Engaging__self&#45;&gt;EngagingEvadingObstacle</title>
+<path fill="none" stroke="#444444" d="M689.29,-379C667.54,-366.72 646.48,-348.67 657.46,-328.2 665.1,-313.97 678.18,-302.77 691.76,-294.28"/>
+<polygon fill="#444444" stroke="#444444" points="692.78,-296.52 697.57,-290.86 690.3,-292.3 692.78,-296.52"/>
+<text xml:space="preserve" text-anchor="middle" x="692.73" y="-336.3" font-family="Helvetica,sans-Serif" font-size="9.00" fill="#333333">p.onCrashCourse</text>
+</g>
+<!-- EngagingEvadingEnemy -->
+<g id="node8" class="node">
+<title>EngagingEvadingEnemy</title>
+<g id="a_node8"><a xlink:title="Reads: p.underFire">
+<path fill="white" stroke="#555555" d="M1018.24,-289.8C1018.24,-289.8 891.76,-289.8 891.76,-289.8 885.76,-289.8 879.76,-283.8 879.76,-277.8 879.76,-277.8 879.76,-265.8 879.76,-265.8 879.76,-259.8 885.76,-253.8 891.76,-253.8 891.76,-253.8 1018.24,-253.8 1018.24,-253.8 1024.24,-253.8 1030.24,-259.8 1030.24,-265.8 1030.24,-265.8 1030.24,-277.8 1030.24,-277.8 1030.24,-283.8 1024.24,-289.8 1018.24,-289.8"/>
+<text xml:space="preserve" text-anchor="start" x="887.76" y="-272.9" font-family="Helvetica,sans-Serif" font-weight="bold" font-size="11.00">engaging.evading_enemy</text>
+<text xml:space="preserve" text-anchor="start" x="895.46" y="-263.7" font-family="Helvetica,sans-Serif" font-size="9.00" fill="#555555">tree: EngagingEvadingEnemy</text>
+</a>
+</g>
+</g>
+<!-- Engaging__self&#45;&gt;EngagingEvadingEnemy -->
+<g id="edge14" class="edge">
+<title>Engaging__self&#45;&gt;EngagingEvadingEnemy</title>
+<path fill="none" stroke="#444444" d="M764.74,-378.58C782.57,-370.23 804.06,-359.84 823,-349.8 856.32,-332.14 893.33,-310.35 919.66,-294.47"/>
+<polygon fill="#444444" stroke="#444444" points="920.78,-296.65 925.5,-290.93 918.24,-292.46 920.78,-296.65"/>
+<text xml:space="preserve" text-anchor="middle" x="882.78" y="-336.3" font-family="Helvetica,sans-Serif" font-size="9.00" fill="#333333">p.underFire</text>
+</g>
+<!-- EngagingEvadingObstacle&#45;&gt;Engaging__self -->
+<g id="edge15" class="edge">
+<title>EngagingEvadingObstacle&#45;&gt;Engaging__self</title>
+<path fill="none" stroke="#444444" d="M740.5,-290.29C739.91,-305.94 738.64,-329.47 736,-349.8 735.13,-356.5 733.88,-363.68 732.59,-370.34"/>
+<polygon fill="#444444" stroke="#444444" points="730.24,-369.58 731.25,-376.93 735.04,-370.55 730.24,-369.58"/>
+<text xml:space="preserve" text-anchor="middle" x="774.73" y="-336.3" font-family="Helvetica,sans-Serif" font-size="9.00" fill="#333333">!p.onCrashCourse</text>
+</g>
+<!-- EngagingEvadingEnemy&#45;&gt;Engaging__self -->
+<g id="edge16" class="edge">
+<title>EngagingEvadingEnemy&#45;&gt;Engaging__self</title>
+<path fill="none" stroke="#444444" d="M951.26,-290.21C946.54,-307.88 936.69,-334.7 918,-349.8 876.67,-383.19 814.92,-392.98 772.91,-395.52"/>
+<polygon fill="#444444" stroke="#444444" points="772.89,-393.07 766.03,-395.87 773.14,-397.96 772.89,-393.07"/>
+<text xml:space="preserve" text-anchor="middle" x="959.91" y="-336.3" font-family="Helvetica,sans-Serif" font-size="9.00" fill="#333333">!p.underFire</text>
+</g>
+<!-- Fleeing__self -->
+<g id="node10" class="node">
+<title>Fleeing__self</title>
+<g id="a_node10"><a xlink:title="Run from the target, engines burning; a flee&#45;then&#45;stand enemy that has lost its pursuer turns back.&#10;&#10;Reads: p.lostPursuer, p.moraleType, p.onCrashCourse, p.underFire">
+<path fill="white" stroke="#555555" d="M1484.01,-289.8C1484.01,-289.8 1441.99,-289.8 1441.99,-289.8 1435.99,-289.8 1429.99,-283.8 1429.99,-277.8 1429.99,-277.8 1429.99,-265.8 1429.99,-265.8 1429.99,-259.8 1435.99,-253.8 1441.99,-253.8 1441.99,-253.8 1484.01,-253.8 1484.01,-253.8 1490.01,-253.8 1496.01,-259.8 1496.01,-265.8 1496.01,-265.8 1496.01,-277.8 1496.01,-277.8 1496.01,-283.8 1490.01,-289.8 1484.01,-289.8"/>
+<text xml:space="preserve" text-anchor="start" x="1445.28" y="-272.9" font-family="Helvetica,sans-Serif" font-weight="bold" font-size="11.00">fleeing</text>
+<text xml:space="preserve" text-anchor="start" x="1437.99" y="-263.7" font-family="Helvetica,sans-Serif" font-size="9.00" fill="#555555">tree: Fleeing</text>
+</a>
+</g>
+</g>
+<!-- MoraleBroken__init&#45;&gt;Fleeing__self -->
+<g id="edge18" class="edge">
+<title>MoraleBroken__init&#45;&gt;Fleeing__self</title>
+<path fill="none" stroke="#444444" d="M1515.97,-394.21C1506.76,-389.17 1479.01,-372.55 1468,-349.8 1460.32,-333.93 1459.21,-314.02 1459.95,-298.43"/>
+<polygon fill="#444444" stroke="#444444" points="1462.37,-298.92 1460.42,-291.77 1457.49,-298.58 1462.37,-298.92"/>
+<text xml:space="preserve" text-anchor="middle" x="1393.58" y="-363.21" font-family="Helvetica,sans-Serif" font-size="9.00" fill="#333333">(p.haveVisual || p.radarSignature) &amp;&amp;</text>
+<text xml:space="preserve" text-anchor="middle" x="1393.58" y="-352.41" font-family="Helvetica,sans-Serif" font-size="9.00" fill="#333333"> &#160;!p.lostPursuer</text>
+</g>
+<!-- MoraleBroken__init&#45;&gt;Fleeing__self -->
+<g id="edge20" class="edge">
+<title>MoraleBroken__init&#45;&gt;Fleeing__self</title>
+<path fill="none" stroke="#888888" d="M1517.83,-393.23C1512.33,-381.15 1488.69,-329.22 1474.3,-297.63"/>
+<polygon fill="#888888" stroke="#888888" points="1476.62,-296.81 1471.49,-291.45 1472.16,-298.84 1476.62,-296.81"/>
+<text xml:space="preserve" text-anchor="middle" x="1570.43" y="-341.7" font-family="Helvetica,sans-Serif" font-size="9.00" fill="#333333">!(p.lostPursuer &amp;&amp; p.moraleType ==</text>
+<text xml:space="preserve" text-anchor="middle" x="1570.43" y="-330.9" font-family="Helvetica,sans-Serif" font-size="9.00" fill="#333333"> &#160;MoraleType.FLEE_THEN_STAND)</text>
+</g>
+<!-- FinalStand__self -->
+<g id="node13" class="node">
+<title>FinalStand__self</title>
+<g id="a_node13"><a xlink:title="Having shaken off its pursuer, it turns back to fight to the end: the FinalStand tree, a Starbuck 180 on a dead engine and then Engaging.&#10;&#10;Reads: p.onCrashCourse, p.underFire">
+<path fill="white" stroke="#555555" d="M1791.77,-164.8C1791.77,-164.8 1736.23,-164.8 1736.23,-164.8 1730.23,-164.8 1724.23,-158.8 1724.23,-152.8 1724.23,-152.8 1724.23,-140.8 1724.23,-140.8 1724.23,-134.8 1730.23,-128.8 1736.23,-128.8 1736.23,-128.8 1791.77,-128.8 1791.77,-128.8 1797.77,-128.8 1803.77,-134.8 1803.77,-140.8 1803.77,-140.8 1803.77,-152.8 1803.77,-152.8 1803.77,-158.8 1797.77,-164.8 1791.77,-164.8"/>
+<text xml:space="preserve" text-anchor="start" x="1734.97" y="-147.9" font-family="Helvetica,sans-Serif" font-weight="bold" font-size="11.00">final_stand</text>
+<text xml:space="preserve" text-anchor="start" x="1732.23" y="-138.7" font-family="Helvetica,sans-Serif" font-size="9.00" fill="#555555">tree: FinalStand</text>
+</a>
+</g>
+</g>
+<!-- MoraleBroken__init&#45;&gt;FinalStand__self -->
+<g id="edge19" class="edge">
+<title>MoraleBroken__init&#45;&gt;FinalStand__self</title>
+<path fill="none" stroke="#888888" d="M1522.84,-395.51C1540.21,-394.02 1612.34,-385.81 1655,-349.8 1712.1,-301.6 1744.03,-215.65 1757.03,-173.1"/>
+<polygon fill="#888888" stroke="#888888" points="1759.3,-174.05 1758.95,-166.64 1754.6,-172.65 1759.3,-174.05"/>
+<text xml:space="preserve" text-anchor="middle" x="1803.8" y="-274.5" font-family="Helvetica,sans-Serif" font-size="9.00" fill="#333333">p.lostPursuer &amp;&amp; p.moraleType ==</text>
+<text xml:space="preserve" text-anchor="middle" x="1803.8" y="-263.7" font-family="Helvetica,sans-Serif" font-size="9.00" fill="#333333"> &#160;MoraleType.FLEE_THEN_STAND</text>
+</g>
+<!-- MoraleBroken__init&#45;&gt;NoState -->
+<g id="edge17" class="edge">
+<title>MoraleBroken__init&#45;&gt;NoState</title>
+<path fill="none" stroke="#444444" d="M2056,-322.47C2057.38,-321.72 2058.71,-320.96 2060,-320.2 2069.2,-314.72 2076.73,-305.8 2082.42,-297.16"/>
+<polygon fill="#444444" stroke="#444444" points="2084.41,-298.6 2085.97,-291.35 2080.23,-296.05 2084.41,-298.6"/>
+<text xml:space="preserve" text-anchor="middle" x="2003.28" y="-311.43" font-family="Helvetica,sans-Serif" font-size="9.00" fill="#333333">!p.haveVisual &amp;&amp; !p.radarSignature</text>
+</g>
+<!-- FleeingEvadingObstacle -->
+<g id="node11" class="node">
+<title>FleeingEvadingObstacle</title>
+<g id="a_node11"><a xlink:title="Reads: p.onCrashCourse">
+<path fill="white" stroke="#555555" d="M1302.41,-164.8C1302.41,-164.8 1179.59,-164.8 1179.59,-164.8 1173.59,-164.8 1167.59,-158.8 1167.59,-152.8 1167.59,-152.8 1167.59,-140.8 1167.59,-140.8 1167.59,-134.8 1173.59,-128.8 1179.59,-128.8 1179.59,-128.8 1302.41,-128.8 1302.41,-128.8 1308.41,-128.8 1314.41,-134.8 1314.41,-140.8 1314.41,-140.8 1314.41,-152.8 1314.41,-152.8 1314.41,-158.8 1308.41,-164.8 1302.41,-164.8"/>
+<text xml:space="preserve" text-anchor="start" x="1175.59" y="-147.9" font-family="Helvetica,sans-Serif" font-weight="bold" font-size="11.00">fleeing.evading_obstacle</text>
+<text xml:space="preserve" text-anchor="start" x="1181.97" y="-138.7" font-family="Helvetica,sans-Serif" font-size="9.00" fill="#555555">tree: FleeingEvadingObstacle</text>
+</a>
+</g>
+</g>
+<!-- Fleeing__self&#45;&gt;FleeingEvadingObstacle -->
+<g id="edge21" class="edge">
+<title>Fleeing__self&#45;&gt;FleeingEvadingObstacle</title>
+<path fill="none" stroke="#444444" d="M1429.65,-271.1C1356.81,-270.97 1187.14,-266.13 1151.46,-224.8 1133.25,-203.7 1159.64,-183.29 1188.4,-168.79"/>
+<polygon fill="#444444" stroke="#444444" points="1189.14,-171.15 1194.37,-165.89 1187,-166.74 1189.14,-171.15"/>
+<text xml:space="preserve" text-anchor="middle" x="1186.73" y="-211.3" font-family="Helvetica,sans-Serif" font-size="9.00" fill="#333333">p.onCrashCourse</text>
+</g>
+<!-- FleeingEvadingEnemy -->
+<g id="node12" class="node">
+<title>FleeingEvadingEnemy</title>
+<g id="a_node12"><a xlink:title="Reads: p.underFire">
+<path fill="white" stroke="#555555" d="M1508.52,-164.8C1508.52,-164.8 1395.48,-164.8 1395.48,-164.8 1389.48,-164.8 1383.48,-158.8 1383.48,-152.8 1383.48,-152.8 1383.48,-140.8 1383.48,-140.8 1383.48,-134.8 1389.48,-128.8 1395.48,-128.8 1395.48,-128.8 1508.52,-128.8 1508.52,-128.8 1514.52,-128.8 1520.52,-134.8 1520.52,-140.8 1520.52,-140.8 1520.52,-152.8 1520.52,-152.8 1520.52,-158.8 1514.52,-164.8 1508.52,-164.8"/>
+<text xml:space="preserve" text-anchor="start" x="1391.48" y="-147.9" font-family="Helvetica,sans-Serif" font-weight="bold" font-size="11.00">fleeing.evading_enemy</text>
+<text xml:space="preserve" text-anchor="start" x="1396.72" y="-138.7" font-family="Helvetica,sans-Serif" font-size="9.00" fill="#555555">tree: FleeingEvadingEnemy</text>
+</a>
+</g>
+</g>
+<!-- Fleeing__self&#45;&gt;FleeingEvadingEnemy -->
+<g id="edge22" class="edge">
+<title>Fleeing__self&#45;&gt;FleeingEvadingEnemy</title>
+<path fill="none" stroke="#444444" d="M1431.16,-253.49C1420.85,-246.12 1410.63,-236.49 1404.98,-224.8 1395.89,-206 1409.02,-185.9 1423.69,-170.95"/>
+<polygon fill="#444444" stroke="#444444" points="1425.13,-172.96 1428.47,-166.34 1421.73,-169.43 1425.13,-172.96"/>
+<text xml:space="preserve" text-anchor="middle" x="1427.99" y="-211.3" font-family="Helvetica,sans-Serif" font-size="9.00" fill="#333333">p.underFire</text>
+</g>
+<!-- Fleeing__self&#45;&gt;FinalStand__self -->
+<g id="edge23" class="edge">
+<title>Fleeing__self&#45;&gt;FinalStand__self</title>
+<path fill="none" stroke="#444444" d="M1479.56,-253.47C1485.59,-247.89 1492.72,-242.05 1500,-237.8 1569.81,-197.05 1660.83,-171.17 1715.72,-158.1"/>
+<polygon fill="#444444" stroke="#444444" points="1716.14,-160.52 1722.4,-156.54 1715.03,-155.75 1716.14,-160.52"/>
+<text xml:space="preserve" text-anchor="middle" x="1639.84" y="-216.7" font-family="Helvetica,sans-Serif" font-size="9.00" fill="#333333">p.lostPursuer &amp;&amp; p.moraleType ==</text>
+<text xml:space="preserve" text-anchor="middle" x="1639.84" y="-205.9" font-family="Helvetica,sans-Serif" font-size="9.00" fill="#333333"> &#160;MoraleType.FLEE_THEN_STAND</text>
+</g>
+<!-- FleeingEvadingObstacle&#45;&gt;Fleeing__self -->
+<g id="edge24" class="edge">
+<title>FleeingEvadingObstacle&#45;&gt;Fleeing__self</title>
+<path fill="none" stroke="#444444" d="M1253.96,-165.23C1267.77,-182.64 1291.17,-209.03 1316.96,-224.8 1349.3,-244.57 1390.93,-256.59 1421.45,-263.35"/>
+<polygon fill="#444444" stroke="#444444" points="1420.92,-265.75 1428.27,-264.81 1421.94,-260.95 1420.92,-265.75"/>
+<text xml:space="preserve" text-anchor="middle" x="1353.48" y="-211.3" font-family="Helvetica,sans-Serif" font-size="9.00" fill="#333333">!p.onCrashCourse</text>
+</g>
+<!-- FleeingEvadingEnemy&#45;&gt;Fleeing__self -->
+<g id="edge25" class="edge">
+<title>FleeingEvadingEnemy&#45;&gt;Fleeing__self</title>
+<path fill="none" stroke="#444444" d="M1454.5,-165.23C1456,-176.13 1457.82,-190.46 1459,-203.2 1460.29,-217.09 1461.24,-232.62 1461.89,-245.29"/>
+<polygon fill="#444444" stroke="#444444" points="1459.43,-245.17 1462.22,-252.04 1464.33,-244.93 1459.43,-245.17"/>
+<text xml:space="preserve" text-anchor="middle" x="1484.87" y="-211.3" font-family="Helvetica,sans-Serif" font-size="9.00" fill="#333333">!p.underFire</text>
+</g>
+<!-- FinalStandEvadingObstacle -->
+<g id="node14" class="node">
+<title>FinalStandEvadingObstacle</title>
+<g id="a_node14"><a xlink:title="Reads: p.onCrashCourse">
+<path fill="white" stroke="#555555" d="M1780.72,-60C1780.72,-60 1635.28,-60 1635.28,-60 1629.28,-60 1623.28,-54 1623.28,-48 1623.28,-48 1623.28,-36 1623.28,-36 1623.28,-30 1629.28,-24 1635.28,-24 1635.28,-24 1780.72,-24 1780.72,-24 1786.72,-24 1792.72,-30 1792.72,-36 1792.72,-36 1792.72,-48 1792.72,-48 1792.72,-54 1786.72,-60 1780.72,-60"/>
+<text xml:space="preserve" text-anchor="start" x="1631.28" y="-43.1" font-family="Helvetica,sans-Serif" font-weight="bold" font-size="11.00">final_stand.evading_obstacle</text>
+<text xml:space="preserve" text-anchor="start" x="1642.21" y="-33.9" font-family="Helvetica,sans-Serif" font-size="9.00" fill="#555555">tree: FinalStandEvadingObstacle</text>
+</a>
+</g>
+</g>
+<!-- FinalStand__self&#45;&gt;FinalStandEvadingObstacle -->
+<g id="edge26" class="edge">
+<title>FinalStand__self&#45;&gt;FinalStandEvadingObstacle</title>
+<path fill="none" stroke="#444444" d="M1724.03,-144.05C1692.64,-140.32 1650.78,-129.62 1629.46,-99.8 1619.27,-85.55 1630.37,-73.49 1647.11,-64.2"/>
+<polygon fill="#444444" stroke="#444444" points="1648.12,-66.44 1653.24,-61.08 1645.89,-62.08 1648.12,-66.44"/>
+<text xml:space="preserve" text-anchor="middle" x="1664.73" y="-91.7" font-family="Helvetica,sans-Serif" font-size="9.00" fill="#333333">p.onCrashCourse</text>
+</g>
+<!-- FinalStandEvadingEnemy -->
+<g id="node15" class="node">
+<title>FinalStandEvadingEnemy</title>
+<g id="a_node15"><a xlink:title="Reads: p.underFire">
+<path fill="white" stroke="#555555" d="M1992.83,-60C1992.83,-60 1857.17,-60 1857.17,-60 1851.17,-60 1845.17,-54 1845.17,-48 1845.17,-48 1845.17,-36 1845.17,-36 1845.17,-30 1851.17,-24 1857.17,-24 1857.17,-24 1992.83,-24 1992.83,-24 1998.83,-24 2004.83,-30 2004.83,-36 2004.83,-36 2004.83,-48 2004.83,-48 2004.83,-54 1998.83,-60 1992.83,-60"/>
+<text xml:space="preserve" text-anchor="start" x="1853.17" y="-43.1" font-family="Helvetica,sans-Serif" font-weight="bold" font-size="11.00">final_stand.evading_enemy</text>
+<text xml:space="preserve" text-anchor="start" x="1862.96" y="-33.9" font-family="Helvetica,sans-Serif" font-size="9.00" fill="#555555">tree: FinalStandEvadingEnemy</text>
+</a>
+</g>
+</g>
+<!-- FinalStand__self&#45;&gt;FinalStandEvadingEnemy -->
+<g id="edge27" class="edge">
+<title>FinalStand__self&#45;&gt;FinalStandEvadingEnemy</title>
+<path fill="none" stroke="#444444" d="M1791.31,-128.36C1818.8,-110.81 1861.28,-83.69 1890.95,-64.74"/>
+<polygon fill="#444444" stroke="#444444" points="1891.97,-67 1896.55,-61.17 1889.33,-62.87 1891.97,-67"/>
+<text xml:space="preserve" text-anchor="middle" x="1872.34" y="-91.7" font-family="Helvetica,sans-Serif" font-size="9.00" fill="#333333">p.underFire</text>
+</g>
+<!-- FinalStandEvadingObstacle&#45;&gt;FinalStand__self -->
+<g id="edge28" class="edge">
+<title>FinalStandEvadingObstacle&#45;&gt;FinalStand__self</title>
+<path fill="none" stroke="#444444" d="M1717.36,-60.18C1726.46,-76.88 1740.36,-102.41 1750.63,-121.25"/>
+<polygon fill="#444444" stroke="#444444" points="1748.28,-122.06 1753.78,-127.03 1752.58,-119.71 1748.28,-122.06"/>
+<text xml:space="preserve" text-anchor="middle" x="1774.2" y="-91.7" font-family="Helvetica,sans-Serif" font-size="9.00" fill="#333333">!p.onCrashCourse</text>
+</g>
+<!-- FinalStandEvadingEnemy&#45;&gt;FinalStand__self -->
+<g id="edge29" class="edge">
+<title>FinalStandEvadingEnemy&#45;&gt;FinalStand__self</title>
+<path fill="none" stroke="#444444" d="M1923.68,-60.3C1921.83,-72.82 1917.44,-89.32 1907,-99.8 1881.92,-124.99 1843,-136.4 1812.09,-141.56"/>
+<polygon fill="#444444" stroke="#444444" points="1812.06,-139.08 1805.51,-142.57 1812.8,-143.93 1812.06,-139.08"/>
+<text xml:space="preserve" text-anchor="middle" x="1938.83" y="-91.7" font-family="Helvetica,sans-Serif" font-size="9.00" fill="#333333">!p.underFire</text>
+</g>
+</g>
+</svg>
+</div>
+      <p class="bt-src">Scroll sideways to see all of it. <a href="ai-diagrams/hsm.svg">Open the diagram on its own</a> to zoom with the browser.</p>
+    </section>
+
+    <section id="hsm-json">
+      <h2>The state machine as JSON</h2>
+      <p>Two JSON files describe the decision layer:</p>
+      <ul class="plain">
+        <li><strong><code>hsm.json</code></strong>, generated from the code with the diagram above: every state (its parent, the tree it flies, the facts it reads, its notes) and every arrow with its conditions. <code>INITIAL</code> arrows are a superstate's starting choices; <code>TRANSITION</code> arrows are switches.</li>
+        <li><strong><code>enemy-pilot-spec.json</code></strong>, the hand-written spec from the Enemy AI doc ("The HSM as JSON"). The build's tests check the code against it, so the two can't drift apart.</li>
+      </ul>
+      <details class="json" open>
+        <summary><code>hsm.json</code>, generated from the code · <a href="ai-diagrams/hsm.json" download>download</a></summary>
+        <pre><code>{
+  &quot;states&quot;: [
+    {&quot;id&quot;: &quot;MoraleGood&quot;, &quot;name&quot;: &quot;morale_good&quot;, &quot;parent&quot;: null, &quot;behavior&quot;: null, &quot;urgent&quot;: false, &quot;interrupt&quot;: false, &quot;ignoresPlayerCollisions&quot;: false, &quot;facts&quot;: [&quot;p.damageTaken&quot;, &quot;p.haveOrders&quot;, &quot;p.haveVisual&quot;, &quot;p.moraleType&quot;, &quot;p.radarSignature&quot;], &quot;doc&quot;: &quot;Where an enemy follows orders, closes and engages. Damage moves the two fleeing morale types to [MoraleBroken], for good.&quot;},
+    {&quot;id&quot;: &quot;FollowingOrders&quot;, &quot;name&quot;: &quot;following_orders&quot;, &quot;parent&quot;: &quot;MoraleGood&quot;, &quot;behavior&quot;: &quot;TreeBehavior(\&quot;FollowingOrders\&quot;)&quot;, &quot;urgent&quot;: false, &quot;interrupt&quot;: false, &quot;ignoresPlayerCollisions&quot;: false, &quot;facts&quot;: [], &quot;doc&quot;: &quot;No contact, but an order: fly its heading (the stand-in conductor re-aims it at the player).&quot;},
+    {&quot;id&quot;: &quot;Closing&quot;, &quot;name&quot;: &quot;closing&quot;, &quot;parent&quot;: &quot;MoraleGood&quot;, &quot;behavior&quot;: &quot;TreeBehavior(\&quot;Closing\&quot;)&quot;, &quot;urgent&quot;: false, &quot;interrupt&quot;: false, &quot;ignoresPlayerCollisions&quot;: false, &quot;facts&quot;: [&quot;p.onCrashCourse&quot;, &quot;p.underFire&quot;], &quot;doc&quot;: &quot;The target on radar but not in sight: head for where it&#x27;s going to be.&quot;},
+    {&quot;id&quot;: &quot;ClosingEvadingObstacle&quot;, &quot;name&quot;: &quot;closing.evading_obstacle&quot;, &quot;parent&quot;: &quot;Closing&quot;, &quot;behavior&quot;: &quot;TreeBehavior(\&quot;ClosingEvadingObstacle\&quot;)&quot;, &quot;urgent&quot;: false, &quot;interrupt&quot;: false, &quot;ignoresPlayerCollisions&quot;: false, &quot;facts&quot;: [&quot;p.onCrashCourse&quot;], &quot;doc&quot;: null},
+    {&quot;id&quot;: &quot;ClosingEvadingEnemy&quot;, &quot;name&quot;: &quot;closing.evading_enemy&quot;, &quot;parent&quot;: &quot;Closing&quot;, &quot;behavior&quot;: &quot;TreeBehavior(\&quot;ClosingEvadingEnemy\&quot;)&quot;, &quot;urgent&quot;: false, &quot;interrupt&quot;: false, &quot;ignoresPlayerCollisions&quot;: false, &quot;facts&quot;: [&quot;p.underFire&quot;], &quot;doc&quot;: null},
+    {&quot;id&quot;: &quot;Engaging&quot;, &quot;name&quot;: &quot;engaging&quot;, &quot;parent&quot;: &quot;MoraleGood&quot;, &quot;behavior&quot;: &quot;TreeBehavior(\&quot;Engaging\&quot;)&quot;, &quot;urgent&quot;: false, &quot;interrupt&quot;: false, &quot;ignoresPlayerCollisions&quot;: false, &quot;facts&quot;: [&quot;p.onCrashCourse&quot;, &quot;p.underFire&quot;], &quot;doc&quot;: &quot;The target in sight: the Engaging tree (the Enemy AI doc&#x27;s draft). Turn to face the target and burn; once close, engine kills, small pivots and pot shots. Each time in, its aim error starts fresh; leaving ends any burst. Being in the target&#x27;s sights doesn&#x27;t send it evading; only being under fire does.&quot;},
+    {&quot;id&quot;: &quot;EngagingEvadingObstacle&quot;, &quot;name&quot;: &quot;engaging.evading_obstacle&quot;, &quot;parent&quot;: &quot;Engaging&quot;, &quot;behavior&quot;: &quot;TreeBehavior(\&quot;EngagingEvadingObstacle\&quot;)&quot;, &quot;urgent&quot;: false, &quot;interrupt&quot;: false, &quot;ignoresPlayerCollisions&quot;: false, &quot;facts&quot;: [&quot;p.onCrashCourse&quot;], &quot;doc&quot;: null},
+    {&quot;id&quot;: &quot;EngagingEvadingEnemy&quot;, &quot;name&quot;: &quot;engaging.evading_enemy&quot;, &quot;parent&quot;: &quot;Engaging&quot;, &quot;behavior&quot;: &quot;TreeBehavior(\&quot;EngagingEvadingEnemy\&quot;)&quot;, &quot;urgent&quot;: false, &quot;interrupt&quot;: false, &quot;ignoresPlayerCollisions&quot;: false, &quot;facts&quot;: [&quot;p.underFire&quot;], &quot;doc&quot;: null},
+    {&quot;id&quot;: &quot;MoraleBroken&quot;, &quot;name&quot;: &quot;morale_broken&quot;, &quot;parent&quot;: null, &quot;behavior&quot;: null, &quot;urgent&quot;: false, &quot;interrupt&quot;: false, &quot;ignoresPlayerCollisions&quot;: false, &quot;facts&quot;: [&quot;p.haveVisual&quot;, &quot;p.lostPursuer&quot;, &quot;p.moraleType&quot;, &quot;p.radarSignature&quot;], &quot;doc&quot;: &quot;Morale broken: it runs, and never recovers.&quot;},
+    {&quot;id&quot;: &quot;Fleeing&quot;, &quot;name&quot;: &quot;fleeing&quot;, &quot;parent&quot;: &quot;MoraleBroken&quot;, &quot;behavior&quot;: &quot;TreeBehavior(\&quot;Fleeing\&quot;)&quot;, &quot;urgent&quot;: false, &quot;interrupt&quot;: false, &quot;ignoresPlayerCollisions&quot;: false, &quot;facts&quot;: [&quot;p.lostPursuer&quot;, &quot;p.moraleType&quot;, &quot;p.onCrashCourse&quot;, &quot;p.underFire&quot;], &quot;doc&quot;: &quot;Run from the target, engines burning; a flee-then-stand enemy that has lost its pursuer turns back.&quot;},
+    {&quot;id&quot;: &quot;FleeingEvadingObstacle&quot;, &quot;name&quot;: &quot;fleeing.evading_obstacle&quot;, &quot;parent&quot;: &quot;Fleeing&quot;, &quot;behavior&quot;: &quot;TreeBehavior(\&quot;FleeingEvadingObstacle\&quot;)&quot;, &quot;urgent&quot;: false, &quot;interrupt&quot;: false, &quot;ignoresPlayerCollisions&quot;: false, &quot;facts&quot;: [&quot;p.onCrashCourse&quot;], &quot;doc&quot;: null},
+    {&quot;id&quot;: &quot;FleeingEvadingEnemy&quot;, &quot;name&quot;: &quot;fleeing.evading_enemy&quot;, &quot;parent&quot;: &quot;Fleeing&quot;, &quot;behavior&quot;: &quot;TreeBehavior(\&quot;FleeingEvadingEnemy\&quot;)&quot;, &quot;urgent&quot;: false, &quot;interrupt&quot;: false, &quot;ignoresPlayerCollisions&quot;: false, &quot;facts&quot;: [&quot;p.underFire&quot;], &quot;doc&quot;: null},
+    {&quot;id&quot;: &quot;FinalStand&quot;, &quot;name&quot;: &quot;final_stand&quot;, &quot;parent&quot;: &quot;MoraleBroken&quot;, &quot;behavior&quot;: &quot;TreeBehavior(\&quot;FinalStand\&quot;)&quot;, &quot;urgent&quot;: false, &quot;interrupt&quot;: false, &quot;ignoresPlayerCollisions&quot;: false, &quot;facts&quot;: [&quot;p.onCrashCourse&quot;, &quot;p.underFire&quot;], &quot;doc&quot;: &quot;Having shaken off its pursuer, it turns back to fight to the end: the FinalStand tree, a Starbuck 180 on a dead engine and then Engaging.&quot;},
+    {&quot;id&quot;: &quot;FinalStandEvadingObstacle&quot;, &quot;name&quot;: &quot;final_stand.evading_obstacle&quot;, &quot;parent&quot;: &quot;FinalStand&quot;, &quot;behavior&quot;: &quot;TreeBehavior(\&quot;FinalStandEvadingObstacle\&quot;)&quot;, &quot;urgent&quot;: false, &quot;interrupt&quot;: false, &quot;ignoresPlayerCollisions&quot;: false, &quot;facts&quot;: [&quot;p.onCrashCourse&quot;], &quot;doc&quot;: null},
+    {&quot;id&quot;: &quot;FinalStandEvadingEnemy&quot;, &quot;name&quot;: &quot;final_stand.evading_enemy&quot;, &quot;parent&quot;: &quot;FinalStand&quot;, &quot;behavior&quot;: &quot;TreeBehavior(\&quot;FinalStandEvadingEnemy\&quot;)&quot;, &quot;urgent&quot;: false, &quot;interrupt&quot;: false, &quot;ignoresPlayerCollisions&quot;: false, &quot;facts&quot;: [&quot;p.underFire&quot;], &quot;doc&quot;: null},
+    {&quot;id&quot;: &quot;NoState&quot;, &quot;name&quot;: &quot;no_state&quot;, &quot;parent&quot;: null, &quot;behavior&quot;: &quot;LetGo&quot;, &quot;urgent&quot;: false, &quot;interrupt&quot;: false, &quot;ignoresPlayerCollisions&quot;: false, &quot;facts&quot;: [], &quot;doc&quot;: &quot;Out of the machine (the JSON&#x27;s \&quot;to\&quot;: null): no contact and nothing to do. It lets go of its keys, and World despawns it once it&#x27;s off screen.&quot;}
+  ],
+  &quot;arrows&quot;: [
+    {&quot;from&quot;: &quot;MoraleGood&quot;, &quot;to&quot;: &quot;NoState&quot;, &quot;kind&quot;: &quot;TRANSITION&quot;, &quot;conditions&quot;: [&quot;!p.haveVisual &amp;&amp; !p.radarSignature &amp;&amp; !p.haveOrders&quot;], &quot;computed&quot;: null},
+    {&quot;from&quot;: &quot;MoraleGood&quot;, &quot;to&quot;: &quot;MoraleBroken&quot;, &quot;kind&quot;: &quot;TRANSITION&quot;, &quot;conditions&quot;: [&quot;p.damageTaken &amp;&amp; p.moraleType != MoraleType.FIGHTS_TO_DEATH&quot;], &quot;computed&quot;: null},
+    {&quot;from&quot;: &quot;MoraleGood&quot;, &quot;to&quot;: &quot;Closing&quot;, &quot;kind&quot;: &quot;TRANSITION&quot;, &quot;conditions&quot;: [&quot;!p.haveVisual &amp;&amp; p.radarSignature&quot;], &quot;computed&quot;: null},
+    {&quot;from&quot;: &quot;MoraleGood&quot;, &quot;to&quot;: &quot;Engaging&quot;, &quot;kind&quot;: &quot;TRANSITION&quot;, &quot;conditions&quot;: [&quot;p.haveVisual&quot;], &quot;computed&quot;: null},
+    {&quot;from&quot;: &quot;MoraleGood&quot;, &quot;to&quot;: &quot;FollowingOrders&quot;, &quot;kind&quot;: &quot;TRANSITION&quot;, &quot;conditions&quot;: [&quot;!p.haveVisual &amp;&amp; !p.radarSignature &amp;&amp; p.haveOrders&quot;], &quot;computed&quot;: null},
+    {&quot;from&quot;: &quot;MoraleGood&quot;, &quot;to&quot;: &quot;Engaging&quot;, &quot;kind&quot;: &quot;INITIAL&quot;, &quot;conditions&quot;: [&quot;p.haveVisual&quot;], &quot;computed&quot;: null},
+    {&quot;from&quot;: &quot;MoraleGood&quot;, &quot;to&quot;: &quot;Closing&quot;, &quot;kind&quot;: &quot;INITIAL&quot;, &quot;conditions&quot;: [&quot;p.radarSignature&quot;], &quot;computed&quot;: null},
+    {&quot;from&quot;: &quot;MoraleGood&quot;, &quot;to&quot;: &quot;FollowingOrders&quot;, &quot;kind&quot;: &quot;INITIAL&quot;, &quot;conditions&quot;: [&quot;!p.haveVisual &amp;&amp; !p.radarSignature&quot;], &quot;computed&quot;: null},
+    {&quot;from&quot;: &quot;Closing&quot;, &quot;to&quot;: &quot;ClosingEvadingObstacle&quot;, &quot;kind&quot;: &quot;TRANSITION&quot;, &quot;conditions&quot;: [&quot;p.onCrashCourse&quot;], &quot;computed&quot;: null},
+    {&quot;from&quot;: &quot;Closing&quot;, &quot;to&quot;: &quot;ClosingEvadingEnemy&quot;, &quot;kind&quot;: &quot;TRANSITION&quot;, &quot;conditions&quot;: [&quot;p.underFire&quot;], &quot;computed&quot;: null},
+    {&quot;from&quot;: &quot;ClosingEvadingObstacle&quot;, &quot;to&quot;: &quot;Closing&quot;, &quot;kind&quot;: &quot;TRANSITION&quot;, &quot;conditions&quot;: [&quot;!p.onCrashCourse&quot;], &quot;computed&quot;: null},
+    {&quot;from&quot;: &quot;ClosingEvadingEnemy&quot;, &quot;to&quot;: &quot;Closing&quot;, &quot;kind&quot;: &quot;TRANSITION&quot;, &quot;conditions&quot;: [&quot;!p.underFire&quot;], &quot;computed&quot;: null},
+    {&quot;from&quot;: &quot;Engaging&quot;, &quot;to&quot;: &quot;EngagingEvadingObstacle&quot;, &quot;kind&quot;: &quot;TRANSITION&quot;, &quot;conditions&quot;: [&quot;p.onCrashCourse&quot;], &quot;computed&quot;: null},
+    {&quot;from&quot;: &quot;Engaging&quot;, &quot;to&quot;: &quot;EngagingEvadingEnemy&quot;, &quot;kind&quot;: &quot;TRANSITION&quot;, &quot;conditions&quot;: [&quot;p.underFire&quot;], &quot;computed&quot;: null},
+    {&quot;from&quot;: &quot;EngagingEvadingObstacle&quot;, &quot;to&quot;: &quot;Engaging&quot;, &quot;kind&quot;: &quot;TRANSITION&quot;, &quot;conditions&quot;: [&quot;!p.onCrashCourse&quot;], &quot;computed&quot;: null},
+    {&quot;from&quot;: &quot;EngagingEvadingEnemy&quot;, &quot;to&quot;: &quot;Engaging&quot;, &quot;kind&quot;: &quot;TRANSITION&quot;, &quot;conditions&quot;: [&quot;!p.underFire&quot;], &quot;computed&quot;: null},
+    {&quot;from&quot;: &quot;MoraleBroken&quot;, &quot;to&quot;: &quot;NoState&quot;, &quot;kind&quot;: &quot;TRANSITION&quot;, &quot;conditions&quot;: [&quot;!p.haveVisual &amp;&amp; !p.radarSignature&quot;], &quot;computed&quot;: null},
+    {&quot;from&quot;: &quot;MoraleBroken&quot;, &quot;to&quot;: &quot;Fleeing&quot;, &quot;kind&quot;: &quot;TRANSITION&quot;, &quot;conditions&quot;: [&quot;(p.haveVisual || p.radarSignature) &amp;&amp; !p.lostPursuer&quot;], &quot;computed&quot;: null},
+    {&quot;from&quot;: &quot;MoraleBroken&quot;, &quot;to&quot;: &quot;FinalStand&quot;, &quot;kind&quot;: &quot;INITIAL&quot;, &quot;conditions&quot;: [&quot;p.lostPursuer &amp;&amp; p.moraleType == MoraleType.FLEE_THEN_STAND&quot;], &quot;computed&quot;: null},
+    {&quot;from&quot;: &quot;MoraleBroken&quot;, &quot;to&quot;: &quot;Fleeing&quot;, &quot;kind&quot;: &quot;INITIAL&quot;, &quot;conditions&quot;: [&quot;!(p.lostPursuer &amp;&amp; p.moraleType == MoraleType.FLEE_THEN_STAND)&quot;], &quot;computed&quot;: null},
+    {&quot;from&quot;: &quot;Fleeing&quot;, &quot;to&quot;: &quot;FleeingEvadingObstacle&quot;, &quot;kind&quot;: &quot;TRANSITION&quot;, &quot;conditions&quot;: [&quot;p.onCrashCourse&quot;], &quot;computed&quot;: null},
+    {&quot;from&quot;: &quot;Fleeing&quot;, &quot;to&quot;: &quot;FleeingEvadingEnemy&quot;, &quot;kind&quot;: &quot;TRANSITION&quot;, &quot;conditions&quot;: [&quot;p.underFire&quot;], &quot;computed&quot;: null},
+    {&quot;from&quot;: &quot;Fleeing&quot;, &quot;to&quot;: &quot;FinalStand&quot;, &quot;kind&quot;: &quot;TRANSITION&quot;, &quot;conditions&quot;: [&quot;p.lostPursuer &amp;&amp; p.moraleType == MoraleType.FLEE_THEN_STAND&quot;], &quot;computed&quot;: null},
+    {&quot;from&quot;: &quot;FleeingEvadingObstacle&quot;, &quot;to&quot;: &quot;Fleeing&quot;, &quot;kind&quot;: &quot;TRANSITION&quot;, &quot;conditions&quot;: [&quot;!p.onCrashCourse&quot;], &quot;computed&quot;: null},
+    {&quot;from&quot;: &quot;FleeingEvadingEnemy&quot;, &quot;to&quot;: &quot;Fleeing&quot;, &quot;kind&quot;: &quot;TRANSITION&quot;, &quot;conditions&quot;: [&quot;!p.underFire&quot;], &quot;computed&quot;: null},
+    {&quot;from&quot;: &quot;FinalStand&quot;, &quot;to&quot;: &quot;FinalStandEvadingObstacle&quot;, &quot;kind&quot;: &quot;TRANSITION&quot;, &quot;conditions&quot;: [&quot;p.onCrashCourse&quot;], &quot;computed&quot;: null},
+    {&quot;from&quot;: &quot;FinalStand&quot;, &quot;to&quot;: &quot;FinalStandEvadingEnemy&quot;, &quot;kind&quot;: &quot;TRANSITION&quot;, &quot;conditions&quot;: [&quot;p.underFire&quot;], &quot;computed&quot;: null},
+    {&quot;from&quot;: &quot;FinalStandEvadingObstacle&quot;, &quot;to&quot;: &quot;FinalStand&quot;, &quot;kind&quot;: &quot;TRANSITION&quot;, &quot;conditions&quot;: [&quot;!p.onCrashCourse&quot;], &quot;computed&quot;: null},
+    {&quot;from&quot;: &quot;FinalStandEvadingEnemy&quot;, &quot;to&quot;: &quot;FinalStand&quot;, &quot;kind&quot;: &quot;TRANSITION&quot;, &quot;conditions&quot;: [&quot;!p.underFire&quot;], &quot;computed&quot;: null}
+  ]
+}</code></pre>
+      </details>
+      <details class="json">
+        <summary><code>enemy-pilot-spec.json</code>, the spec the tests check · <a href="ai-diagrams/enemy-pilot-spec.json" download>download</a></summary>
+        <pre><code>{
+  &quot;machine&quot;: &quot;enemy_pilot&quot;,
+  &quot;status&quot;: &quot;draft&quot;,
+  &quot;source&quot;: &quot;The Enemy AI doc, \&quot;The HSM as JSON\&quot; (rev 1736): the spec HsmSpecTest checks the Kotlin machine against. Keep it in step with the doc.&quot;,
+  &quot;transition_rules&quot;: {
+    &quot;interrupting_parents&quot;: [&quot;morale_good&quot;, &quot;morale_broken&quot;],
+    &quot;interrupt_depth&quot;: &quot;direct children only&quot;,
+    &quot;order&quot;: [&quot;interrupting parent&#x27;s rules&quot;, &quot;innermost state&#x27;s rules&quot;],
+    &quot;within_a_state&quot;: &quot;first true rule in listed order&quot;,
+    &quot;to_active_state&quot;: &quot;ignored&quot;,
+    &quot;initial_state&quot;: &quot;morale_good&quot;
+  },
+  &quot;percepts&quot;: {
+    &quot;have_visual&quot;:     { &quot;type&quot;: &quot;bool&quot;, &quot;note&quot;: &quot;Today&#x27;s nose cone; stays on for a tunable few seconds after losing sight&quot; },
+    &quot;radar_signature&quot;: { &quot;type&quot;: &quot;bool&quot;, &quot;note&quot;: &quot;Listed as &#x27;radar indicator&#x27; among the percepts. Stays on for LOST_TARGET_TICKS (2 s) after contact drops; perception keeps the countdown&quot; },
+    &quot;have_orders&quot;:     { &quot;type&quot;: &quot;bool&quot;, &quot;note&quot;: &quot;True while the enemy holds an order&quot; },
+    &quot;order&quot;:           { &quot;type&quot;: &quot;record&quot;, &quot;fields&quot;: { &quot;kind&quot;: &quot;heading&quot;, &quot;bearing&quot;: &quot;radians&quot; }, &quot;set_by&quot;: &quot;Level Conductor; a spawn stand-in for the demo, which re-aims the bearing at the player every few seconds&quot;, &quot;note&quot;: &quot;Only kind &#x27;heading&#x27; for now. Later kinds, such as engaging another target, add fields without changing the trees&quot; },
+    &quot;on_crash_course&quot;: { &quot;type&quot;: &quot;bool&quot; },
+    &quot;under_fire&quot;:      { &quot;type&quot;: &quot;bool&quot;, &quot;level&quot;: &quot;under_fire_level = clamp(under_fire_level - under_fire_decay_per_second / 120 + under_fire_gain * near_miss, 0, 1)&quot;, &quot;on_when&quot;: &quot;under_fire_level &gt;= under_fire_enter&quot;, &quot;off_when&quot;: &quot;under_fire_level &lt;= under_fire_exit&quot;, &quot;note&quot;: &quot;Each near miss the pilot notices adds under_fire_gain; the level decays at a constant rate. Two thresholds, so an enemy keeps evading until it has gone a while without a close shot. Better pilots notice more of the shots&quot; },
+    &quot;damage_taken&quot;:    { &quot;type&quot;: &quot;bool&quot;, &quot;latched&quot;: true, &quot;note&quot;: &quot;Any hull damage, including collisions with rocks and ships. Once on, stays on: morale only breaks one way&quot; },
+    &quot;outnumbered&quot;:     { &quot;type&quot;: &quot;int&quot;, &quot;note&quot;: &quot;0 or 1&quot; },
+    &quot;near_miss&quot;:       { &quot;type&quot;: &quot;int&quot;, &quot;note&quot;: &quot;1 on a tick with a noticed close round, else 0: a near miss, a round that crossed the hit box but failed the hit roll, or a hit&quot; },
+    &quot;outgunned&quot;:       { &quot;type&quot;: &quot;number&quot;, &quot;formula&quot;: &quot;outgunned * outgunned_decay + (1 - outgunned_decay) * outnumbered * near_miss&quot;, &quot;note&quot;: &quot;Climbs from 0 while outnumbered and taking near misses, decays toward 0 otherwise, never leaves 0..1. Feeds morale; not used by any transition yet&quot; },
+    &quot;lost_pursuer&quot;:    { &quot;type&quot;: &quot;bool&quot;, &quot;latched&quot;: true, &quot;note&quot;: &quot;Turns on once a fleeing enemy has left the player&#x27;s camera view as currently framed (zoom included), and stays on so a Final Stand enemy isn&#x27;t sent back to Fleeing&quot; },
+    &quot;morale_type&quot;:     { &quot;type&quot;: &quot;enum&quot;, &quot;values&quot;: [&quot;fights_to_death&quot;, &quot;flee_for_good&quot;, &quot;flee_then_stand&quot;], &quot;fixed_at_spawn&quot;: true, &quot;note&quot;: &quot;How much the pilot feels it can take on; rules read it like any other percept&quot; }
+  },
+  &quot;params&quot;: {
+    &quot;outgunned_decay&quot;: null,
+    &quot;under_fire_gain&quot;: 0.4,
+    &quot;under_fire_decay_per_second&quot;: 0.5,
+    &quot;under_fire_enter&quot;: 1.0,
+    &quot;under_fire_exit&quot;: 0.0
+  },
+  &quot;params_note&quot;: &quot;under_fire_gain and under_fire_decay_per_second are starting values for every NPC through step 4; both stay tunable, later per NPC type and difficulty&quot;,
+  &quot;states&quot;: [
+    {
+      &quot;id&quot;: &quot;morale_good&quot;,
+      &quot;transitions&quot;: [
+        { &quot;to&quot;: null,               &quot;when&quot;: &quot;!have_visual &amp;&amp; !radar_signature &amp;&amp; !have_orders&quot; },
+        { &quot;to&quot;: &quot;morale_broken&quot;,    &quot;when&quot;: &quot;damage_taken &amp;&amp; morale_type != &#x27;fights_to_death&#x27;&quot; },
+        { &quot;to&quot;: &quot;closing&quot;,          &quot;when&quot;: &quot;!have_visual &amp;&amp; radar_signature&quot; },
+        { &quot;to&quot;: &quot;engaging&quot;,         &quot;when&quot;: &quot;have_visual&quot; },
+        { &quot;to&quot;: &quot;following_orders&quot;, &quot;when&quot;: &quot;!have_visual &amp;&amp; !radar_signature &amp;&amp; have_orders&quot; }
+      ],
+      &quot;states&quot;: [
+        {
+          &quot;id&quot;: &quot;following_orders&quot;
+        },
+        {
+          &quot;id&quot;: &quot;closing&quot;,
+          &quot;transitions&quot;: [
+            { &quot;to&quot;: &quot;closing.evading_obstacle&quot;, &quot;when&quot;: &quot;on_crash_course&quot; },
+            { &quot;to&quot;: &quot;closing.evading_enemy&quot;,    &quot;when&quot;: &quot;under_fire&quot; }
+          ],
+          &quot;states&quot;: [
+            {
+              &quot;id&quot;: &quot;closing.evading_obstacle&quot;,
+              &quot;transitions&quot;: [
+                { &quot;to&quot;: &quot;closing&quot;, &quot;when&quot;: &quot;!on_crash_course&quot; }
+              ]
+            },
+            {
+              &quot;id&quot;: &quot;closing.evading_enemy&quot;,
+              &quot;note&quot;: &quot;Enemies pick targets as the player does, so one can be chasing and under fire at once&quot;,
+              &quot;transitions&quot;: [
+                { &quot;to&quot;: &quot;closing&quot;, &quot;when&quot;: &quot;!under_fire&quot;, &quot;note&quot;: &quot;Smarter NPCs might try attacking instead&quot; }
+              ]
+            }
+          ]
+        },
+        {
+          &quot;id&quot;: &quot;engaging&quot;,
+          &quot;behavior_tree&quot;: &quot;Engaging&quot;,
+          &quot;transitions&quot;: [
+            { &quot;to&quot;: &quot;engaging.evading_obstacle&quot;, &quot;when&quot;: &quot;on_crash_course&quot; },
+            { &quot;to&quot;: &quot;engaging.evading_enemy&quot;,    &quot;when&quot;: &quot;under_fire&quot; }
+          ],
+          &quot;states&quot;: [
+            {
+              &quot;id&quot;: &quot;engaging.evading_obstacle&quot;,
+              &quot;transitions&quot;: [
+                { &quot;to&quot;: &quot;engaging&quot;, &quot;when&quot;: &quot;!on_crash_course&quot; }
+              ]
+            },
+            {
+              &quot;id&quot;: &quot;engaging.evading_enemy&quot;,
+              &quot;note&quot;: &quot;Enemies pick targets as the player does, so one can be chasing and under fire at once&quot;,
+              &quot;transitions&quot;: [
+                { &quot;to&quot;: &quot;engaging&quot;, &quot;when&quot;: &quot;!under_fire&quot;, &quot;note&quot;: &quot;Smarter NPCs might try attacking instead&quot; }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      &quot;id&quot;: &quot;morale_broken&quot;,
+      &quot;transitions&quot;: [
+        { &quot;to&quot;: null,      &quot;when&quot;: &quot;!have_visual &amp;&amp; !radar_signature&quot; },
+        { &quot;to&quot;: &quot;fleeing&quot;, &quot;when&quot;: &quot;(have_visual || radar_signature) &amp;&amp; !lost_pursuer&quot; }
+      ],
+      &quot;states&quot;: [
+        {
+          &quot;id&quot;: &quot;fleeing&quot;,
+          &quot;behavior_tree&quot;: &quot;Fleeing&quot;,
+          &quot;transitions&quot;: [
+            { &quot;to&quot;: &quot;fleeing.evading_obstacle&quot;, &quot;when&quot;: &quot;on_crash_course&quot; },
+            { &quot;to&quot;: &quot;fleeing.evading_enemy&quot;,    &quot;when&quot;: &quot;under_fire&quot; },
+            { &quot;to&quot;: &quot;final_stand&quot;,              &quot;when&quot;: &quot;lost_pursuer &amp;&amp; morale_type == &#x27;flee_then_stand&#x27;&quot; }
+          ],
+          &quot;states&quot;: [
+            {
+              &quot;id&quot;: &quot;fleeing.evading_obstacle&quot;,
+              &quot;transitions&quot;: [
+                { &quot;to&quot;: &quot;fleeing&quot;, &quot;when&quot;: &quot;!on_crash_course&quot; }
+              ]
+            },
+            {
+              &quot;id&quot;: &quot;fleeing.evading_enemy&quot;,
+              &quot;note&quot;: &quot;Enemies pick targets as the player does, so one can be chasing and under fire at once&quot;,
+              &quot;transitions&quot;: [
+                { &quot;to&quot;: &quot;fleeing&quot;, &quot;when&quot;: &quot;!under_fire&quot; }
+              ]
+            }
+          ]
+        },
+        {
+          &quot;id&quot;: &quot;final_stand&quot;,
+          &quot;transitions&quot;: [
+            { &quot;to&quot;: &quot;final_stand.evading_obstacle&quot;, &quot;when&quot;: &quot;on_crash_course&quot; },
+            { &quot;to&quot;: &quot;final_stand.evading_enemy&quot;,    &quot;when&quot;: &quot;under_fire&quot; }
+          ],
+          &quot;states&quot;: [
+            {
+              &quot;id&quot;: &quot;final_stand.evading_obstacle&quot;,
+              &quot;transitions&quot;: [
+                { &quot;to&quot;: &quot;final_stand&quot;, &quot;when&quot;: &quot;!on_crash_course&quot; }
+              ]
+            },
+            {
+              &quot;id&quot;: &quot;final_stand.evading_enemy&quot;,
+              &quot;note&quot;: &quot;Enemies pick targets as the player does, so one can be chasing and under fire at once&quot;,
+              &quot;transitions&quot;: [
+                { &quot;to&quot;: &quot;final_stand&quot;, &quot;when&quot;: &quot;!under_fire&quot; }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}</code></pre>
+      </details>
+    </section>
+
+    <section id="acting">
+      <h2>Acting layer: the behavior trees</h2>
+      <p>Every state that flies the ship does it with a tree. Trees tick from the top: a <strong>Sequence</strong> (→) runs its children left to right until one fails; a <strong>Fallback</strong> (?) tries them left to right until one succeeds. <strong>Reactive</strong> versions re-check earlier children every tick, so a lost target stops the tree at once. Ports show their values; <code>{name}</code> is a blackboard key shared between nodes. A SubTree box links to the tree it calls.</p>
+      <div class="bt-legend">
+  <span class="bt-key bt-control">Control: Sequence → / Fallback ?</span>
+  <span class="bt-key bt-decorator">Decorator</span>
+  <span class="bt-key bt-condition">Condition</span>
+  <span class="bt-key bt-action">Action</span>
+  <span class="bt-key bt-subtree">SubTree call</span>
+</div>
+      <h3>Which tree each state flies</h3>
+      <div class="table-wrap"><table>
+        <thead><tr><th>State</th><th>Tree</th></tr></thead>
+        <tbody>
+          <tr><td><code>following_orders</code></td><td><a href="#bt-FollowingOrders">FollowingOrders</a></td></tr>
+          <tr><td><code>closing</code></td><td><a href="#bt-Closing">Closing</a></td></tr>
+          <tr><td><code>closing.evading_obstacle</code></td><td>ClosingEvadingObstacle, which calls <a href="#bt-EvadingObstacle">EvadingObstacle</a></td></tr>
+          <tr><td><code>closing.evading_enemy</code></td><td>ClosingEvadingEnemy, which calls <a href="#bt-EvadingEnemy">EvadingEnemy</a></td></tr>
+          <tr><td><code>engaging</code></td><td><a href="#bt-Engaging">Engaging</a></td></tr>
+          <tr><td><code>engaging.evading_obstacle</code></td><td>EngagingEvadingObstacle, which calls <a href="#bt-EvadingObstacle">EvadingObstacle</a></td></tr>
+          <tr><td><code>engaging.evading_enemy</code></td><td>EngagingEvadingEnemy, which calls <a href="#bt-EvadingEnemy">EvadingEnemy</a></td></tr>
+          <tr><td><code>fleeing</code></td><td><a href="#bt-Fleeing">Fleeing</a></td></tr>
+          <tr><td><code>fleeing.evading_obstacle</code></td><td>FleeingEvadingObstacle, which calls <a href="#bt-EvadingObstacle">EvadingObstacle</a></td></tr>
+          <tr><td><code>fleeing.evading_enemy</code></td><td>FleeingEvadingEnemy, which calls <a href="#bt-EvadingEnemy">EvadingEnemy</a></td></tr>
+          <tr><td><code>final_stand</code></td><td><a href="#bt-FinalStand">FinalStand</a></td></tr>
+          <tr><td><code>final_stand.evading_obstacle</code></td><td>FinalStandEvadingObstacle, which calls <a href="#bt-EvadingObstacle">EvadingObstacle</a></td></tr>
+          <tr><td><code>final_stand.evading_enemy</code></td><td>FinalStandEvadingEnemy, which calls <a href="#bt-EvadingEnemy">EvadingEnemy</a></td></tr>
+          <tr><td><code>no_state</code></td><td><code>LetGo</code> (Kotlin, no tree)</td></tr>
+        </tbody>
+      </table></div>
+      <p>The superstates (<code>morale_good</code>, <code>morale_broken</code>) only hold rules and fly nothing.</p>
+      <div class="bt-tree" id="bt-FollowingOrders">
+<h3>FollowingOrders</h3>
+<p>FollowingOrders (following_orders): no contact, but an order. Turn onto the order&#x27;s heading and burn along it (the Enemy AI doc&#x27;s draft, &quot;Trees with no draft yet&quot;). The stand-in conductor re-aims the heading at the player every few seconds, so an enemy that loses contact keeps coming.</p>
+<p>Every tick it first lets go of everything, then presses only what this tick needs: the turn always, the engine once the nose is within AI_THRUST_CONE of the heading. With no order it lets go and fails.</p>
+<div class="bt-scroll"><svg class="bt-svg" viewBox="-2 -2 780 264" width="780" height="264" role="img" aria-label="Behavior tree FollowingOrders"><path class="bt-edge" d="M388.1 49.0V66.0H311.9V83.0"/>
+<path class="bt-edge" d="M388.1 49.0V66.0H709.1V83.0"/>
+<path class="bt-edge" d="M311.9 147.0V164.0H78.1V181.0"/>
+<path class="bt-edge" d="M311.9 147.0V164.0H241.4V181.0"/>
+<path class="bt-edge" d="M311.9 147.0V164.0H418.3V181.0"/>
+<path class="bt-edge" d="M311.9 147.0V164.0H575.9V181.0"/>
+<path class="bt-edge" d="M709.1 147.0V164.0H709.1V181.0"/>
+<g class="bt-node bt-control"><title>Reactive Fallback</title><rect class="bt-box" x="309.5" y="0.0" width="157.2" height="49.0" rx="6"/><path class="bt-head" d="M309.5 18.0V6.0a6 6 0 0 1 6 -6H460.7a6 6 0 0 1 6 6V18.0Z"/><text class="bt-headtext" x="388.1" y="13.0">⟳?</text><text class="bt-title" x="388.1" y="37.0">Reactive Fallback</text></g>
+<g class="bt-node bt-control"><title>Reactive Sequence &quot;follow&quot;</title><rect class="bt-box" x="233.3" y="83.0" width="157.2" height="64.0" rx="6"/><path class="bt-head" d="M233.3 101.0V89.0a6 6 0 0 1 6 -6H384.5a6 6 0 0 1 6 6V101.0Z"/><text class="bt-headtext" x="311.9" y="96.0">⟳→</text><text class="bt-title" x="311.9" y="120.0">Reactive Sequence</text><text class="bt-name" x="311.9" y="135.0">“follow”</text></g>
+<g class="bt-node bt-action"><title>OrderHeading</title><rect class="bt-box" x="0.0" y="181.0" width="156.2" height="64.0" rx="6"/><path class="bt-head" d="M0.0 199.0V187.0a6 6 0 0 1 6 -6H150.2a6 6 0 0 1 6 6V199.0Z"/><text class="bt-headtext" x="78.1" y="194.0">Action</text><text class="bt-title" x="78.1" y="218.0">OrderHeading</text><text class="bt-port" x="78.1" y="233.0">heading = <tspan class="bt-val">{heading}</tspan></text></g>
+<g class="bt-node bt-action"><title>ReleaseAllKeys</title><rect class="bt-box" x="174.2" y="181.0" width="134.4" height="49.0" rx="6"/><path class="bt-head" d="M174.2 199.0V187.0a6 6 0 0 1 6 -6H302.6a6 6 0 0 1 6 6V199.0Z"/><text class="bt-headtext" x="241.4" y="194.0">Action</text><text class="bt-title" x="241.4" y="218.0">ReleaseAllKeys</text></g>
+<g class="bt-node bt-action"><title>TurnToBearing</title><rect class="bt-box" x="326.6" y="181.0" width="183.2" height="79.0" rx="6"/><path class="bt-head" d="M326.6 199.0V187.0a6 6 0 0 1 6 -6H503.9a6 6 0 0 1 6 6V199.0Z"/><text class="bt-headtext" x="418.3" y="194.0">Action</text><text class="bt-title" x="418.3" y="218.0">TurnToBearing</text><text class="bt-port" x="418.3" y="233.0">heading = <tspan class="bt-val">{heading}</tspan></text><text class="bt-port" x="418.3" y="248.0">bearing = <tspan class="bt-val">{turnBearing}</tspan></text></g>
+<g class="bt-node bt-action"><title>Thrust</title><rect class="bt-box" x="527.9" y="181.0" width="96.0" height="49.0" rx="6"/><path class="bt-head" d="M527.9 199.0V187.0a6 6 0 0 1 6 -6H617.9a6 6 0 0 1 6 6V199.0Z"/><text class="bt-headtext" x="575.9" y="194.0">Action</text><text class="bt-title" x="575.9" y="218.0">Thrust</text></g>
+<g class="bt-node bt-decorator"><title>ForceFailure &quot;noOrder&quot;</title><rect class="bt-box" x="649.5" y="83.0" width="119.2" height="64.0" rx="6"/><path class="bt-head" d="M649.5 101.0V89.0a6 6 0 0 1 6 -6H762.7a6 6 0 0 1 6 6V101.0Z"/><text class="bt-headtext" x="709.1" y="96.0">Decorator</text><text class="bt-title" x="709.1" y="120.0">ForceFailure</text><text class="bt-name" x="709.1" y="135.0">“noOrder”</text></g>
+<g class="bt-node bt-action"><title>ReleaseAllKeys</title><rect class="bt-box" x="641.9" y="181.0" width="134.4" height="49.0" rx="6"/><path class="bt-head" d="M641.9 199.0V187.0a6 6 0 0 1 6 -6H770.3a6 6 0 0 1 6 6V199.0Z"/><text class="bt-headtext" x="709.1" y="194.0">Action</text><text class="bt-title" x="709.1" y="218.0">ReleaseAllKeys</text></g></svg></div>
+<p class="bt-src">From <code>assets/ai/trees/following_orders.xml</code> · <a href="ai-diagrams/trees/following_orders.xml">XML for Groot2</a></p>
+</div>
+<div class="bt-tree" id="bt-Closing">
+<h3>Closing</h3>
+<p>Closing (closing): the target on radar but not in sight. Head for where it will be at top speed (HeadingToTarget&#x27;s lead) and burn once the nose is within AI_THRUST_CONE of it. With no target it lets go and fails.</p>
+<p>Today&#x27;s lead pursuit, rebuilt from leaves: the doc has no draft for Closing yet, so it flies as the step 4 stand-in (CloseDistance) did.</p>
+<div class="bt-scroll"><svg class="bt-svg" viewBox="-2 -2 780 264" width="780" height="264" role="img" aria-label="Behavior tree Closing"><path class="bt-edge" d="M388.1 49.0V66.0H311.9V83.0"/>
+<path class="bt-edge" d="M388.1 49.0V66.0H709.1V83.0"/>
+<path class="bt-edge" d="M311.9 147.0V164.0H78.1V181.0"/>
+<path class="bt-edge" d="M311.9 147.0V164.0H241.4V181.0"/>
+<path class="bt-edge" d="M311.9 147.0V164.0H418.3V181.0"/>
+<path class="bt-edge" d="M311.9 147.0V164.0H575.9V181.0"/>
+<path class="bt-edge" d="M709.1 147.0V164.0H709.1V181.0"/>
+<g class="bt-node bt-control"><title>Reactive Fallback</title><rect class="bt-box" x="309.5" y="0.0" width="157.2" height="49.0" rx="6"/><path class="bt-head" d="M309.5 18.0V6.0a6 6 0 0 1 6 -6H460.7a6 6 0 0 1 6 6V18.0Z"/><text class="bt-headtext" x="388.1" y="13.0">⟳?</text><text class="bt-title" x="388.1" y="37.0">Reactive Fallback</text></g>
+<g class="bt-node bt-control"><title>Reactive Sequence &quot;close&quot;</title><rect class="bt-box" x="233.3" y="83.0" width="157.2" height="64.0" rx="6"/><path class="bt-head" d="M233.3 101.0V89.0a6 6 0 0 1 6 -6H384.5a6 6 0 0 1 6 6V101.0Z"/><text class="bt-headtext" x="311.9" y="96.0">⟳→</text><text class="bt-title" x="311.9" y="120.0">Reactive Sequence</text><text class="bt-name" x="311.9" y="135.0">“close”</text></g>
+<g class="bt-node bt-action"><title>HeadingToTarget</title><rect class="bt-box" x="0.0" y="181.0" width="156.2" height="64.0" rx="6"/><path class="bt-head" d="M0.0 199.0V187.0a6 6 0 0 1 6 -6H150.2a6 6 0 0 1 6 6V199.0Z"/><text class="bt-headtext" x="78.1" y="194.0">Action</text><text class="bt-title" x="78.1" y="218.0">HeadingToTarget</text><text class="bt-port" x="78.1" y="233.0">heading = <tspan class="bt-val">{heading}</tspan></text></g>
+<g class="bt-node bt-action"><title>ReleaseAllKeys</title><rect class="bt-box" x="174.2" y="181.0" width="134.4" height="49.0" rx="6"/><path class="bt-head" d="M174.2 199.0V187.0a6 6 0 0 1 6 -6H302.6a6 6 0 0 1 6 6V199.0Z"/><text class="bt-headtext" x="241.4" y="194.0">Action</text><text class="bt-title" x="241.4" y="218.0">ReleaseAllKeys</text></g>
+<g class="bt-node bt-action"><title>TurnToBearing</title><rect class="bt-box" x="326.6" y="181.0" width="183.2" height="79.0" rx="6"/><path class="bt-head" d="M326.6 199.0V187.0a6 6 0 0 1 6 -6H503.9a6 6 0 0 1 6 6V199.0Z"/><text class="bt-headtext" x="418.3" y="194.0">Action</text><text class="bt-title" x="418.3" y="218.0">TurnToBearing</text><text class="bt-port" x="418.3" y="233.0">heading = <tspan class="bt-val">{heading}</tspan></text><text class="bt-port" x="418.3" y="248.0">bearing = <tspan class="bt-val">{turnBearing}</tspan></text></g>
+<g class="bt-node bt-action"><title>Thrust</title><rect class="bt-box" x="527.9" y="181.0" width="96.0" height="49.0" rx="6"/><path class="bt-head" d="M527.9 199.0V187.0a6 6 0 0 1 6 -6H617.9a6 6 0 0 1 6 6V199.0Z"/><text class="bt-headtext" x="575.9" y="194.0">Action</text><text class="bt-title" x="575.9" y="218.0">Thrust</text></g>
+<g class="bt-node bt-decorator"><title>ForceFailure &quot;noTarget&quot;</title><rect class="bt-box" x="649.5" y="83.0" width="119.2" height="64.0" rx="6"/><path class="bt-head" d="M649.5 101.0V89.0a6 6 0 0 1 6 -6H762.7a6 6 0 0 1 6 6V101.0Z"/><text class="bt-headtext" x="709.1" y="96.0">Decorator</text><text class="bt-title" x="709.1" y="120.0">ForceFailure</text><text class="bt-name" x="709.1" y="135.0">“noTarget”</text></g>
+<g class="bt-node bt-action"><title>ReleaseAllKeys</title><rect class="bt-box" x="641.9" y="181.0" width="134.4" height="49.0" rx="6"/><path class="bt-head" d="M641.9 199.0V187.0a6 6 0 0 1 6 -6H770.3a6 6 0 0 1 6 6V199.0Z"/><text class="bt-headtext" x="709.1" y="194.0">Action</text><text class="bt-title" x="709.1" y="218.0">ReleaseAllKeys</text></g></svg></div>
+<p class="bt-src">From <code>assets/ai/trees/closing.xml</code> · <a href="ai-diagrams/trees/closing.xml">XML for Groot2</a></p>
+</div>
+<div class="bt-tree" id="bt-Engaging">
+<h3>Engaging</h3>
+<p>Engaging (engaging): the target in sight (the Enemy AI doc&#x27;s draft: check visual or radar, turn to 0° and burn engines, then once close, engine kills, small pivots and pot shots; team-up is tabled).</p>
+<p>Every tick it checks it still has the target and lets go of every key, then:</p>
+<ul class="plain"><li>closeIn, while farther than the knife-fight range: head for where the target will be at top speed and burn once the nose is within AI_THRUST_CONE. No shooting on the way in.</li><li>knifeFight, once inside it: AimAndFire keeps the nose on the bullet-speed lead (with this burst&#x27;s aim error) and fires bursts when lined up: the pot shots. Under it, a loop of maneuvers that override the throttle or the nose: coast on a dead engine, jink a few degrees, coast again, jink again, then a short burn. A coasting enemy that drifts back out of range turns and burns in again; restarting after a big swing of the nose on a dead engine lights the reverse boost and drops its shield, the risk the dead-engine moves carry. With no target it lets go and fails.</li></ul>
+<p>The range, times and angles are first guesses, tuned here.</p>
+<div class="bt-scroll"><svg class="bt-svg" viewBox="-2 -2 2153 573" width="2153" height="573" role="img" aria-label="Behavior tree Engaging"><path class="bt-edge" d="M1074.3 49.0V66.0H998.1V83.0"/>
+<path class="bt-edge" d="M1074.3 49.0V66.0H2081.4V83.0"/>
+<path class="bt-edge" d="M998.1 147.0V164.0H128.2V181.0"/>
+<path class="bt-edge" d="M998.1 147.0V164.0H322.6V181.0"/>
+<path class="bt-edge" d="M998.1 147.0V164.0H456.0V181.0"/>
+<path class="bt-edge" d="M998.1 147.0V164.0H1268.7V181.0"/>
+<path class="bt-edge" d="M128.2 245.0V262.0H48.2V279.0"/>
+<path class="bt-edge" d="M128.2 245.0V262.0H185.4V279.0"/>
+<path class="bt-edge" d="M1268.7 230.0V262.0H1023.9V279.0"/>
+<path class="bt-edge" d="M1268.7 230.0V262.0H1760.4V279.0"/>
+<path class="bt-edge" d="M1023.9 343.0V360.0H592.3V377.0"/>
+<path class="bt-edge" d="M1023.9 343.0V360.0H749.7V377.0"/>
+<path class="bt-edge" d="M1023.9 343.0V360.0H1181.3V377.0"/>
+<path class="bt-edge" d="M1181.3 441.0V473.0H913.8V490.0"/>
+<path class="bt-edge" d="M1181.3 441.0V473.0H1047.6V490.0"/>
+<path class="bt-edge" d="M1181.3 441.0V473.0H1181.3V490.0"/>
+<path class="bt-edge" d="M1181.3 441.0V473.0H1315.1V490.0"/>
+<path class="bt-edge" d="M1181.3 441.0V473.0H1448.8V490.0"/>
+<path class="bt-edge" d="M1760.4 343.0V360.0H1602.8V377.0"/>
+<path class="bt-edge" d="M1760.4 343.0V360.0H1790.6V377.0"/>
+<path class="bt-edge" d="M1760.4 343.0V360.0H1948.2V377.0"/>
+<path class="bt-edge" d="M2081.4 147.0V164.0H2081.4V181.0"/>
+<g class="bt-node bt-control"><title>Reactive Fallback</title><rect class="bt-box" x="995.7" y="0.0" width="157.2" height="49.0" rx="6"/><path class="bt-head" d="M995.7 18.0V6.0a6 6 0 0 1 6 -6H1146.9a6 6 0 0 1 6 6V18.0Z"/><text class="bt-headtext" x="1074.3" y="13.0">⟳?</text><text class="bt-title" x="1074.3" y="37.0">Reactive Fallback</text></g>
+<g class="bt-node bt-control"><title>Reactive Sequence &quot;engage&quot;</title><rect class="bt-box" x="919.5" y="83.0" width="157.2" height="64.0" rx="6"/><path class="bt-head" d="M919.5 101.0V89.0a6 6 0 0 1 6 -6H1070.7a6 6 0 0 1 6 6V101.0Z"/><text class="bt-headtext" x="998.1" y="96.0">⟳→</text><text class="bt-title" x="998.1" y="120.0">Reactive Sequence</text><text class="bt-name" x="998.1" y="135.0">“engage”</text></g>
+<g class="bt-node bt-control"><title>Fallback &quot;contact&quot;</title><rect class="bt-box" x="80.2" y="181.0" width="96.0" height="64.0" rx="6"/><path class="bt-head" d="M80.2 199.0V187.0a6 6 0 0 1 6 -6H170.2a6 6 0 0 1 6 6V199.0Z"/><text class="bt-headtext" x="128.2" y="194.0">?</text><text class="bt-title" x="128.2" y="218.0">Fallback</text><text class="bt-name" x="128.2" y="233.0">“contact”</text></g>
+<g class="bt-node bt-condition"><title>HasVisual</title><rect class="bt-box" x="0.0" y="279.0" width="96.4" height="49.0" rx="6"/><path class="bt-head" d="M0.0 297.0V285.0a6 6 0 0 1 6 -6H90.4a6 6 0 0 1 6 6V297.0Z"/><text class="bt-headtext" x="48.2" y="292.0">Condition</text><text class="bt-title" x="48.2" y="316.0">HasVisual</text></g>
+<g class="bt-node bt-condition"><title>HasRadarContact</title><rect class="bt-box" x="114.4" y="279.0" width="142.0" height="49.0" rx="6"/><path class="bt-head" d="M114.4 297.0V285.0a6 6 0 0 1 6 -6H250.4a6 6 0 0 1 6 6V297.0Z"/><text class="bt-headtext" x="185.4" y="292.0">Condition</text><text class="bt-title" x="185.4" y="316.0">HasRadarContact</text></g>
+<g class="bt-node bt-condition"><title>HasTarget</title><rect class="bt-box" x="274.4" y="181.0" width="96.4" height="49.0" rx="6"/><path class="bt-head" d="M274.4 199.0V187.0a6 6 0 0 1 6 -6H364.8a6 6 0 0 1 6 6V199.0Z"/><text class="bt-headtext" x="322.6" y="194.0">Condition</text><text class="bt-title" x="322.6" y="218.0">HasTarget</text></g>
+<g class="bt-node bt-action"><title>ReleaseAllKeys</title><rect class="bt-box" x="388.8" y="181.0" width="134.4" height="49.0" rx="6"/><path class="bt-head" d="M388.8 199.0V187.0a6 6 0 0 1 6 -6H517.2a6 6 0 0 1 6 6V199.0Z"/><text class="bt-headtext" x="456.0" y="194.0">Action</text><text class="bt-title" x="456.0" y="218.0">ReleaseAllKeys</text></g>
+<g class="bt-node bt-control"><title>Reactive Fallback</title><rect class="bt-box" x="1190.1" y="181.0" width="157.2" height="49.0" rx="6"/><path class="bt-head" d="M1190.1 199.0V187.0a6 6 0 0 1 6 -6H1341.3a6 6 0 0 1 6 6V199.0Z"/><text class="bt-headtext" x="1268.7" y="194.0">⟳?</text><text class="bt-title" x="1268.7" y="218.0">Reactive Fallback</text></g>
+<g class="bt-node bt-control"><title>Reactive Sequence &quot;knifeFight&quot;</title><rect class="bt-box" x="945.3" y="279.0" width="157.2" height="64.0" rx="6"/><path class="bt-head" d="M945.3 297.0V285.0a6 6 0 0 1 6 -6H1096.5a6 6 0 0 1 6 6V297.0Z"/><text class="bt-headtext" x="1023.9" y="292.0">⟳→</text><text class="bt-title" x="1023.9" y="316.0">Reactive Sequence</text><text class="bt-name" x="1023.9" y="331.0">“knifeFight”</text></g>
+<g class="bt-node bt-condition"><title>InRange</title><rect class="bt-box" x="541.2" y="377.0" width="102.2" height="64.0" rx="6"/><path class="bt-head" d="M541.2 395.0V383.0a6 6 0 0 1 6 -6H637.4a6 6 0 0 1 6 6V395.0Z"/><text class="bt-headtext" x="592.3" y="390.0">Condition</text><text class="bt-title" x="592.3" y="414.0">InRange</text><text class="bt-port" x="592.3" y="429.0">range = <tspan class="bt-val">800</tspan></text></g>
+<g class="bt-node bt-action"><title>AimAndFire</title><rect class="bt-box" x="661.4" y="377.0" width="176.5" height="64.0" rx="6"/><path class="bt-head" d="M661.4 395.0V383.0a6 6 0 0 1 6 -6H831.9a6 6 0 0 1 6 6V395.0Z"/><text class="bt-headtext" x="749.7" y="390.0">Action</text><text class="bt-title" x="749.7" y="414.0">AimAndFire</text><text class="bt-port" x="749.7" y="429.0">bearing = <tspan class="bt-val">{aimBearing}</tspan></text></g>
+<g class="bt-node bt-control"><title>Sequence &quot;maneuvers&quot;</title><rect class="bt-box" x="1129.4" y="377.0" width="103.9" height="64.0" rx="6"/><path class="bt-head" d="M1129.4 395.0V383.0a6 6 0 0 1 6 -6H1227.3a6 6 0 0 1 6 6V395.0Z"/><text class="bt-headtext" x="1181.3" y="390.0">→</text><text class="bt-title" x="1181.3" y="414.0">Sequence</text><text class="bt-name" x="1181.3" y="429.0">“maneuvers”</text></g>
+<g class="bt-node bt-action"><title>EngineKill</title><rect class="bt-box" x="855.9" y="490.0" width="115.8" height="64.0" rx="6"/><path class="bt-head" d="M855.9 508.0V496.0a6 6 0 0 1 6 -6H965.7a6 6 0 0 1 6 6V508.0Z"/><text class="bt-headtext" x="913.8" y="503.0">Action</text><text class="bt-title" x="913.8" y="527.0">EngineKill</text><text class="bt-port" x="913.8" y="542.0">seconds = <tspan class="bt-val">1.0</tspan></text></g>
+<g class="bt-node bt-action"><title>Pivot</title><rect class="bt-box" x="989.7" y="490.0" width="115.8" height="79.0" rx="6"/><path class="bt-head" d="M989.7 508.0V496.0a6 6 0 0 1 6 -6H1099.4a6 6 0 0 1 6 6V508.0Z"/><text class="bt-headtext" x="1047.6" y="503.0">Action</text><text class="bt-title" x="1047.6" y="527.0">Pivot</text><text class="bt-port" x="1047.6" y="542.0">degrees = <tspan class="bt-val">25</tspan></text><text class="bt-port" x="1047.6" y="557.0">seconds = <tspan class="bt-val">0.5</tspan></text></g>
+<g class="bt-node bt-action"><title>EngineKill</title><rect class="bt-box" x="1123.4" y="490.0" width="115.8" height="64.0" rx="6"/><path class="bt-head" d="M1123.4 508.0V496.0a6 6 0 0 1 6 -6H1233.2a6 6 0 0 1 6 6V508.0Z"/><text class="bt-headtext" x="1181.3" y="503.0">Action</text><text class="bt-title" x="1181.3" y="527.0">EngineKill</text><text class="bt-port" x="1181.3" y="542.0">seconds = <tspan class="bt-val">0.6</tspan></text></g>
+<g class="bt-node bt-action"><title>Pivot</title><rect class="bt-box" x="1257.2" y="490.0" width="115.8" height="79.0" rx="6"/><path class="bt-head" d="M1257.2 508.0V496.0a6 6 0 0 1 6 -6H1366.9a6 6 0 0 1 6 6V508.0Z"/><text class="bt-headtext" x="1315.1" y="503.0">Action</text><text class="bt-title" x="1315.1" y="527.0">Pivot</text><text class="bt-port" x="1315.1" y="542.0">degrees = <tspan class="bt-val">25</tspan></text><text class="bt-port" x="1315.1" y="557.0">seconds = <tspan class="bt-val">0.5</tspan></text></g>
+<g class="bt-node bt-action"><title>Thrust</title><rect class="bt-box" x="1390.9" y="490.0" width="115.8" height="64.0" rx="6"/><path class="bt-head" d="M1390.9 508.0V496.0a6 6 0 0 1 6 -6H1500.7a6 6 0 0 1 6 6V508.0Z"/><text class="bt-headtext" x="1448.8" y="503.0">Action</text><text class="bt-title" x="1448.8" y="527.0">Thrust</text><text class="bt-port" x="1448.8" y="542.0">seconds = <tspan class="bt-val">0.6</tspan></text></g>
+<g class="bt-node bt-control"><title>Reactive Sequence &quot;closeIn&quot;</title><rect class="bt-box" x="1681.8" y="279.0" width="157.2" height="64.0" rx="6"/><path class="bt-head" d="M1681.8 297.0V285.0a6 6 0 0 1 6 -6H1833.0a6 6 0 0 1 6 6V297.0Z"/><text class="bt-headtext" x="1760.4" y="292.0">⟳→</text><text class="bt-title" x="1760.4" y="316.0">Reactive Sequence</text><text class="bt-name" x="1760.4" y="331.0">“closeIn”</text></g>
+<g class="bt-node bt-action"><title>HeadingToTarget</title><rect class="bt-box" x="1524.7" y="377.0" width="156.2" height="64.0" rx="6"/><path class="bt-head" d="M1524.7 395.0V383.0a6 6 0 0 1 6 -6H1674.9a6 6 0 0 1 6 6V395.0Z"/><text class="bt-headtext" x="1602.8" y="390.0">Action</text><text class="bt-title" x="1602.8" y="414.0">HeadingToTarget</text><text class="bt-port" x="1602.8" y="429.0">heading = <tspan class="bt-val">{heading}</tspan></text></g>
+<g class="bt-node bt-action"><title>TurnToBearing</title><rect class="bt-box" x="1698.9" y="377.0" width="183.2" height="79.0" rx="6"/><path class="bt-head" d="M1698.9 395.0V383.0a6 6 0 0 1 6 -6H1876.2a6 6 0 0 1 6 6V395.0Z"/><text class="bt-headtext" x="1790.6" y="390.0">Action</text><text class="bt-title" x="1790.6" y="414.0">TurnToBearing</text><text class="bt-port" x="1790.6" y="429.0">heading = <tspan class="bt-val">{heading}</tspan></text><text class="bt-port" x="1790.6" y="444.0">bearing = <tspan class="bt-val">{turnBearing}</tspan></text></g>
+<g class="bt-node bt-action"><title>Thrust</title><rect class="bt-box" x="1900.2" y="377.0" width="96.0" height="49.0" rx="6"/><path class="bt-head" d="M1900.2 395.0V383.0a6 6 0 0 1 6 -6H1990.2a6 6 0 0 1 6 6V395.0Z"/><text class="bt-headtext" x="1948.2" y="390.0">Action</text><text class="bt-title" x="1948.2" y="414.0">Thrust</text></g>
+<g class="bt-node bt-decorator"><title>ForceFailure &quot;noTarget&quot;</title><rect class="bt-box" x="2021.8" y="83.0" width="119.2" height="64.0" rx="6"/><path class="bt-head" d="M2021.8 101.0V89.0a6 6 0 0 1 6 -6H2135.0a6 6 0 0 1 6 6V101.0Z"/><text class="bt-headtext" x="2081.4" y="96.0">Decorator</text><text class="bt-title" x="2081.4" y="120.0">ForceFailure</text><text class="bt-name" x="2081.4" y="135.0">“noTarget”</text></g>
+<g class="bt-node bt-action"><title>ReleaseAllKeys</title><rect class="bt-box" x="2014.2" y="181.0" width="134.4" height="49.0" rx="6"/><path class="bt-head" d="M2014.2 199.0V187.0a6 6 0 0 1 6 -6H2142.6a6 6 0 0 1 6 6V199.0Z"/><text class="bt-headtext" x="2081.4" y="194.0">Action</text><text class="bt-title" x="2081.4" y="218.0">ReleaseAllKeys</text></g></svg></div>
+<p class="bt-src">From <code>assets/ai/trees/engaging.xml</code> · <a href="ai-diagrams/trees/engaging.xml">XML for Groot2</a></p>
+</div>
+<div class="bt-tree" id="bt-Fleeing">
+<h3>Fleeing</h3>
+<p>Fleeing (fleeing): morale broken, run (the Enemy AI doc&#x27;s draft: check visual or radar, turn 180° away, burn engines).</p>
+<p>Every tick it takes the heading straight away from the target and lets go of every key, then:</p>
+<ul class="plain"><li>Breakaway: a broken fighter&#x27;s boost, afterburner and booster on while it lasts.</li><li>Reverse: if turning in-plane onto the way out would show it upside down to its pursuer, it yaws round instead, engine on (issue #34). It holds the sequence until the reversal ends.</li><li>Thrust and TurnToBearing: the engine burns the whole time, turns included (issue #59), leaving a vapor trail to follow and keeping the turn going, which is when a shot is least likely to hit. With no target it lets go and fails.</li></ul>
+<div class="bt-scroll"><svg class="bt-svg" viewBox="-2 -2 1100 264" width="1100" height="264" role="img" aria-label="Behavior tree Fleeing"><path class="bt-edge" d="M548.1 49.0V66.0H471.9V83.0"/>
+<path class="bt-edge" d="M548.1 49.0V66.0H1029.1V83.0"/>
+<path class="bt-edge" d="M471.9 147.0V164.0H93.8V181.0"/>
+<path class="bt-edge" d="M471.9 147.0V164.0H272.8V181.0"/>
+<path class="bt-edge" d="M471.9 147.0V164.0H406.2V181.0"/>
+<path class="bt-edge" d="M471.9 147.0V164.0H550.5V181.0"/>
+<path class="bt-edge" d="M471.9 147.0V164.0H694.6V181.0"/>
+<path class="bt-edge" d="M471.9 147.0V164.0H852.3V181.0"/>
+<path class="bt-edge" d="M1029.1 147.0V164.0H1029.1V181.0"/>
+<g class="bt-node bt-control"><title>Reactive Fallback</title><rect class="bt-box" x="469.5" y="0.0" width="157.2" height="49.0" rx="6"/><path class="bt-head" d="M469.5 18.0V6.0a6 6 0 0 1 6 -6H620.8a6 6 0 0 1 6 6V18.0Z"/><text class="bt-headtext" x="548.1" y="13.0">⟳?</text><text class="bt-title" x="548.1" y="37.0">Reactive Fallback</text></g>
+<g class="bt-node bt-control"><title>Reactive Sequence &quot;flee&quot;</title><rect class="bt-box" x="393.4" y="83.0" width="157.2" height="64.0" rx="6"/><path class="bt-head" d="M393.4 101.0V89.0a6 6 0 0 1 6 -6H544.5a6 6 0 0 1 6 6V101.0Z"/><text class="bt-headtext" x="471.9" y="96.0">⟳→</text><text class="bt-title" x="471.9" y="120.0">Reactive Sequence</text><text class="bt-name" x="471.9" y="135.0">“flee”</text></g>
+<g class="bt-node bt-action"><title>HeadingAwayFromTarget</title><rect class="bt-box" x="0.0" y="181.0" width="187.6" height="64.0" rx="6"/><path class="bt-head" d="M0.0 199.0V187.0a6 6 0 0 1 6 -6H181.6a6 6 0 0 1 6 6V199.0Z"/><text class="bt-headtext" x="93.8" y="194.0">Action</text><text class="bt-title" x="93.8" y="218.0">HeadingAwayFromTarget</text><text class="bt-port" x="93.8" y="233.0">heading = <tspan class="bt-val">{heading}</tspan></text></g>
+<g class="bt-node bt-action"><title>ReleaseAllKeys</title><rect class="bt-box" x="205.6" y="181.0" width="134.4" height="49.0" rx="6"/><path class="bt-head" d="M205.6 199.0V187.0a6 6 0 0 1 6 -6H334.0a6 6 0 0 1 6 6V199.0Z"/><text class="bt-headtext" x="272.8" y="194.0">Action</text><text class="bt-title" x="272.8" y="218.0">ReleaseAllKeys</text></g>
+<g class="bt-node bt-action"><title>Breakaway</title><rect class="bt-box" x="358.0" y="181.0" width="96.4" height="49.0" rx="6"/><path class="bt-head" d="M358.0 199.0V187.0a6 6 0 0 1 6 -6H448.4a6 6 0 0 1 6 6V199.0Z"/><text class="bt-headtext" x="406.2" y="194.0">Action</text><text class="bt-title" x="406.2" y="218.0">Breakaway</text></g>
+<g class="bt-node bt-action"><title>Reverse</title><rect class="bt-box" x="472.4" y="181.0" width="156.2" height="64.0" rx="6"/><path class="bt-head" d="M472.4 199.0V187.0a6 6 0 0 1 6 -6H622.6a6 6 0 0 1 6 6V199.0Z"/><text class="bt-headtext" x="550.5" y="194.0">Action</text><text class="bt-title" x="550.5" y="218.0">Reverse</text><text class="bt-port" x="550.5" y="233.0">heading = <tspan class="bt-val">{heading}</tspan></text></g>
+<g class="bt-node bt-action"><title>Thrust</title><rect class="bt-box" x="646.6" y="181.0" width="96.0" height="49.0" rx="6"/><path class="bt-head" d="M646.6 199.0V187.0a6 6 0 0 1 6 -6H736.6a6 6 0 0 1 6 6V199.0Z"/><text class="bt-headtext" x="694.6" y="194.0">Action</text><text class="bt-title" x="694.6" y="218.0">Thrust</text></g>
+<g class="bt-node bt-action"><title>TurnToBearing</title><rect class="bt-box" x="760.6" y="181.0" width="183.2" height="79.0" rx="6"/><path class="bt-head" d="M760.6 199.0V187.0a6 6 0 0 1 6 -6H937.9a6 6 0 0 1 6 6V199.0Z"/><text class="bt-headtext" x="852.3" y="194.0">Action</text><text class="bt-title" x="852.3" y="218.0">TurnToBearing</text><text class="bt-port" x="852.3" y="233.0">heading = <tspan class="bt-val">{heading}</tspan></text><text class="bt-port" x="852.3" y="248.0">bearing = <tspan class="bt-val">{turnBearing}</tspan></text></g>
+<g class="bt-node bt-decorator"><title>ForceFailure &quot;noTarget&quot;</title><rect class="bt-box" x="969.5" y="83.0" width="119.2" height="64.0" rx="6"/><path class="bt-head" d="M969.5 101.0V89.0a6 6 0 0 1 6 -6H1082.7a6 6 0 0 1 6 6V101.0Z"/><text class="bt-headtext" x="1029.1" y="96.0">Decorator</text><text class="bt-title" x="1029.1" y="120.0">ForceFailure</text><text class="bt-name" x="1029.1" y="135.0">“noTarget”</text></g>
+<g class="bt-node bt-action"><title>ReleaseAllKeys</title><rect class="bt-box" x="961.9" y="181.0" width="134.4" height="49.0" rx="6"/><path class="bt-head" d="M961.9 199.0V187.0a6 6 0 0 1 6 -6H1090.3a6 6 0 0 1 6 6V199.0Z"/><text class="bt-headtext" x="1029.1" y="194.0">Action</text><text class="bt-title" x="1029.1" y="218.0">ReleaseAllKeys</text></g></svg></div>
+<p class="bt-src">From <code>assets/ai/trees/fleeing.xml</code> · <a href="ai-diagrams/trees/fleeing.xml">XML for Groot2</a></p>
+</div>
+<div class="bt-tree" id="bt-FinalStand">
+<h3>FinalStand</h3>
+<p>FinalStand (final_stand): a flee-then-stand enemy that has shaken off its pursuer turns back to fight to the end (the Enemy AI doc, &quot;Trees with no draft yet&quot;): a Starbuck 180 on a dead engine to try for a zero, then regular engaging, reusing the Engaging tree as a subtree.</p>
+<ul class="plain"><li>run: it keeps fleeing, engine burning (the Fleeing tree), until the pursuer has caught up to gun range (ENEMY_FIRE_RANGE). A pursuer that never catches up never gets the stand. Fleeing reports SUCCESS once lined up on its way out, so a Repeat keeps it going.</li><li>starbuck: then it kills the engine, and AimAndFire swings the nose round onto the pursuer&#x27;s lead and fires bursts while it coasts on backward, for 2.5 s. No restart inside the move, so no reverse boost and no shield drop there.</li><li>then Engaging, for as long as the stand lasts. Its first burn after the dead-engine swing is a restart, so it lights the reverse boost and drops the shield, as for any pilot. Each time the state is entered (after an evasion, say) it starts over. The 180&#x27;s length is a first guess, tuned here.</li></ul>
+<div class="bt-scroll"><svg class="bt-svg" viewBox="-2 -2 956 513" width="956" height="513" role="img" aria-label="Behavior tree FinalStand"><path class="bt-edge" d="M476.1 49.0V66.0H419.1V83.0"/>
+<path class="bt-edge" d="M476.1 49.0V66.0H904.3V83.0"/>
+<path class="bt-edge" d="M419.1 132.0V149.0H419.1V166.0"/>
+<path class="bt-edge" d="M419.1 230.0V247.0H121.6V264.0"/>
+<path class="bt-edge" d="M419.1 230.0V247.0H549.8V264.0"/>
+<path class="bt-edge" d="M121.6 328.0V345.0H48.0V362.0"/>
+<path class="bt-edge" d="M121.6 328.0V345.0H178.6V362.0"/>
+<path class="bt-edge" d="M178.6 426.0V443.0H178.6V460.0"/>
+<path class="bt-edge" d="M549.8 328.0V345.0H309.4V362.0"/>
+<path class="bt-edge" d="M549.8 328.0V345.0H442.8V362.0"/>
+<path class="bt-edge" d="M549.8 328.0V345.0H616.3V362.0"/>
+<path class="bt-edge" d="M549.8 328.0V345.0H780.4V362.0"/>
+<g class="bt-node bt-control"><title>Sequence</title><rect class="bt-box" x="428.1" y="0.0" width="96.0" height="49.0" rx="6"/><path class="bt-head" d="M428.1 18.0V6.0a6 6 0 0 1 6 -6H518.1a6 6 0 0 1 6 6V18.0Z"/><text class="bt-headtext" x="476.1" y="13.0">→</text><text class="bt-title" x="476.1" y="37.0">Sequence</text></g>
+<g class="bt-node bt-decorator"><title>ForceSuccess</title><rect class="bt-box" x="359.5" y="83.0" width="119.2" height="49.0" rx="6"/><path class="bt-head" d="M359.5 101.0V89.0a6 6 0 0 1 6 -6H472.7a6 6 0 0 1 6 6V101.0Z"/><text class="bt-headtext" x="419.1" y="96.0">Decorator</text><text class="bt-title" x="419.1" y="120.0">ForceSuccess</text></g>
+<g class="bt-node bt-control"><title>Sequence &quot;runThenTurn&quot;</title><rect class="bt-box" x="360.3" y="166.0" width="117.7" height="64.0" rx="6"/><path class="bt-head" d="M360.3 184.0V172.0a6 6 0 0 1 6 -6H472.0a6 6 0 0 1 6 6V184.0Z"/><text class="bt-headtext" x="419.1" y="179.0">→</text><text class="bt-title" x="419.1" y="203.0">Sequence</text><text class="bt-name" x="419.1" y="218.0">“runThenTurn”</text></g>
+<g class="bt-node bt-control"><title>Reactive Fallback &quot;run&quot;</title><rect class="bt-box" x="43.0" y="264.0" width="157.2" height="64.0" rx="6"/><path class="bt-head" d="M43.0 282.0V270.0a6 6 0 0 1 6 -6H194.2a6 6 0 0 1 6 6V282.0Z"/><text class="bt-headtext" x="121.6" y="277.0">⟳?</text><text class="bt-title" x="121.6" y="301.0">Reactive Fallback</text><text class="bt-name" x="121.6" y="316.0">“run”</text></g>
+<g class="bt-node bt-condition"><title>InRange</title><rect class="bt-box" x="0.0" y="362.0" width="96.0" height="49.0" rx="6"/><path class="bt-head" d="M0.0 380.0V368.0a6 6 0 0 1 6 -6H90.0a6 6 0 0 1 6 6V380.0Z"/><text class="bt-headtext" x="48.0" y="375.0">Condition</text><text class="bt-title" x="48.0" y="399.0">InRange</text></g>
+<g class="bt-node bt-decorator"><title>Repeat</title><rect class="bt-box" x="114.0" y="362.0" width="129.2" height="64.0" rx="6"/><path class="bt-head" d="M114.0 380.0V368.0a6 6 0 0 1 6 -6H237.2a6 6 0 0 1 6 6V380.0Z"/><text class="bt-headtext" x="178.6" y="375.0">Decorator</text><text class="bt-title" x="178.6" y="399.0">Repeat</text><text class="bt-port" x="178.6" y="414.0">num_cycles = <tspan class="bt-val">-1</tspan></text></g>
+<g class="bt-node bt-subtree"><title>Fleeing</title><rect class="bt-box" x="130.6" y="460.0" width="96.0" height="49.0" rx="6" stroke-dasharray="5 3"/><path class="bt-head" d="M130.6 478.0V466.0a6 6 0 0 1 6 -6H220.6a6 6 0 0 1 6 6V478.0Z"/><text class="bt-headtext" x="178.6" y="473.0">SubTree</text><text class="bt-title" x="178.6" y="497.0"><a href="#bt-Fleeing">Fleeing</a></text></g>
+<g class="bt-node bt-control"><title>Reactive Sequence &quot;starbuck&quot;</title><rect class="bt-box" x="471.2" y="264.0" width="157.2" height="64.0" rx="6"/><path class="bt-head" d="M471.2 282.0V270.0a6 6 0 0 1 6 -6H622.4a6 6 0 0 1 6 6V282.0Z"/><text class="bt-headtext" x="549.8" y="277.0">⟳→</text><text class="bt-title" x="549.8" y="301.0">Reactive Sequence</text><text class="bt-name" x="549.8" y="316.0">“starbuck”</text></g>
+<g class="bt-node bt-condition"><title>HasTarget</title><rect class="bt-box" x="261.2" y="362.0" width="96.4" height="49.0" rx="6"/><path class="bt-head" d="M261.2 380.0V368.0a6 6 0 0 1 6 -6H351.6a6 6 0 0 1 6 6V380.0Z"/><text class="bt-headtext" x="309.4" y="375.0">Condition</text><text class="bt-title" x="309.4" y="399.0">HasTarget</text></g>
+<g class="bt-node bt-action"><title>ReleaseAllKeys</title><rect class="bt-box" x="375.6" y="362.0" width="134.4" height="49.0" rx="6"/><path class="bt-head" d="M375.6 380.0V368.0a6 6 0 0 1 6 -6H504.0a6 6 0 0 1 6 6V380.0Z"/><text class="bt-headtext" x="442.8" y="375.0">Action</text><text class="bt-title" x="442.8" y="399.0">ReleaseAllKeys</text></g>
+<g class="bt-node bt-action"><title>AimAndFire</title><rect class="bt-box" x="528.0" y="362.0" width="176.5" height="64.0" rx="6"/><path class="bt-head" d="M528.0 380.0V368.0a6 6 0 0 1 6 -6H698.5a6 6 0 0 1 6 6V380.0Z"/><text class="bt-headtext" x="616.3" y="375.0">Action</text><text class="bt-title" x="616.3" y="399.0">AimAndFire</text><text class="bt-port" x="616.3" y="414.0">bearing = <tspan class="bt-val">{aimBearing}</tspan></text></g>
+<g class="bt-node bt-action"><title>EngineKill</title><rect class="bt-box" x="722.5" y="362.0" width="115.8" height="64.0" rx="6"/><path class="bt-head" d="M722.5 380.0V368.0a6 6 0 0 1 6 -6H832.3a6 6 0 0 1 6 6V380.0Z"/><text class="bt-headtext" x="780.4" y="375.0">Action</text><text class="bt-title" x="780.4" y="399.0">EngineKill</text><text class="bt-port" x="780.4" y="414.0">seconds = <tspan class="bt-val">2.5</tspan></text></g>
+<g class="bt-node bt-subtree"><title>Engaging</title><rect class="bt-box" x="856.3" y="83.0" width="96.0" height="49.0" rx="6" stroke-dasharray="5 3"/><path class="bt-head" d="M856.3 101.0V89.0a6 6 0 0 1 6 -6H946.3a6 6 0 0 1 6 6V101.0Z"/><text class="bt-headtext" x="904.3" y="96.0">SubTree</text><text class="bt-title" x="904.3" y="120.0"><a href="#bt-Engaging">Engaging</a></text></g></svg></div>
+<p class="bt-src">From <code>assets/ai/trees/final_stand.xml</code> · <a href="ai-diagrams/trees/final_stand.xml">XML for Groot2</a></p>
+</div>
+<div class="bt-tree" id="bt-EvadingObstacle">
+<h3>EvadingObstacle</h3>
+<p class="bt-note">Shared: every state's <code>…evading_obstacle</code> child flies this, through a one-node wrapper.</p>
+<p>A collision coming: swerve round it, or turn and brake before a rock dead ahead. SUCCESS once the path has stayed clear for AVOID_CLEAR_TICKS.</p>
+<div class="bt-scroll"><svg class="bt-svg" viewBox="-2 -2 131 53" width="131" height="53" role="img" aria-label="Behavior tree EvadingObstacle"><g class="bt-node bt-action"><title>AvoidObstacle</title><rect class="bt-box" x="0.0" y="0.0" width="126.8" height="49.0" rx="6"/><path class="bt-head" d="M0.0 18.0V6.0a6 6 0 0 1 6 -6H120.8a6 6 0 0 1 6 6V18.0Z"/><text class="bt-headtext" x="63.4" y="13.0">Action</text><text class="bt-title" x="63.4" y="37.0">AvoidObstacle</text></g></svg></div>
+<p class="bt-src">From <code>assets/ai/trees/evading.xml</code> · <a href="ai-diagrams/trees/evading.xml">XML for Groot2</a></p>
+</div>
+<div class="bt-tree" id="bt-EvadingEnemy">
+<h3>EvadingEnemy</h3>
+<p class="bt-note">Shared: every state's <code>…evading_enemy</code> child flies this, through a one-node wrapper.</p>
+<p>Under fire: the boost combo off the shooter&#x27;s aim line, burning straight between combos.</p>
+<div class="bt-scroll"><svg class="bt-svg" viewBox="-2 -2 116 53" width="116" height="53" role="img" aria-label="Behavior tree EvadingEnemy"><g class="bt-node bt-action"><title>TurnAndBurn</title><rect class="bt-box" x="0.0" y="0.0" width="111.6" height="49.0" rx="6"/><path class="bt-head" d="M0.0 18.0V6.0a6 6 0 0 1 6 -6H105.6a6 6 0 0 1 6 6V18.0Z"/><text class="bt-headtext" x="55.8" y="13.0">Action</text><text class="bt-title" x="55.8" y="37.0">TurnAndBurn</text></g></svg></div>
+<p class="bt-src">From <code>assets/ai/trees/evading.xml</code> · <a href="ai-diagrams/trees/evading.xml">XML for Groot2</a></p>
+</div>
+<div class="bt-tree" id="bt-StrafeRun">
+<h3>StrafeRun</h3>
+<p class="bt-note">Not flown in play. It's the first tree, kept as a proof: a test checks it flies key for key like the Kotlin it replaced.</p>
+<p>StrafeRun: commit to a pass. Turn onto the bullet-speed lead with this burst&#x27;s aim error, thrust when roughly lined up, fire bursts, and run until the phase timer ends (SUCCESS hands over to breakingOff). With no target it lets go of every key and fails.</p>
+<p>Ported key for key from the StrafeRun lambda in Behaviors.kt, which a test (StrafeRunTreeTest) uses as the reference.</p>
+<div class="bt-scroll"><svg class="bt-svg" viewBox="-2 -2 1083 249" width="1083" height="249" role="img" aria-label="Behavior tree StrafeRun"><path class="bt-edge" d="M539.6 49.0V66.0H463.4V83.0"/>
+<path class="bt-edge" d="M539.6 49.0V66.0H1012.0V83.0"/>
+<path class="bt-edge" d="M463.4 147.0V164.0H48.2V181.0"/>
+<path class="bt-edge" d="M463.4 147.0V164.0H202.6V181.0"/>
+<path class="bt-edge" d="M463.4 147.0V164.0H397.1V181.0"/>
+<path class="bt-edge" d="M463.4 147.0V164.0H638.9V181.0"/>
+<path class="bt-edge" d="M463.4 147.0V164.0H859.6V181.0"/>
+<path class="bt-edge" d="M1012.0 147.0V164.0H1012.0V181.0"/>
+<g class="bt-node bt-control"><title>Reactive Fallback</title><rect class="bt-box" x="461.0" y="0.0" width="157.2" height="49.0" rx="6"/><path class="bt-head" d="M461.0 18.0V6.0a6 6 0 0 1 6 -6H612.2a6 6 0 0 1 6 6V18.0Z"/><text class="bt-headtext" x="539.6" y="13.0">⟳?</text><text class="bt-title" x="539.6" y="37.0">Reactive Fallback</text></g>
+<g class="bt-node bt-control"><title>Reactive Sequence &quot;pass&quot;</title><rect class="bt-box" x="384.8" y="83.0" width="157.2" height="64.0" rx="6"/><path class="bt-head" d="M384.8 101.0V89.0a6 6 0 0 1 6 -6H536.0a6 6 0 0 1 6 6V101.0Z"/><text class="bt-headtext" x="463.4" y="96.0">⟳→</text><text class="bt-title" x="463.4" y="120.0">Reactive Sequence</text><text class="bt-name" x="463.4" y="135.0">“pass”</text></g>
+<g class="bt-node bt-condition"><title>HasTarget</title><rect class="bt-box" x="0.0" y="181.0" width="96.4" height="49.0" rx="6"/><path class="bt-head" d="M0.0 199.0V187.0a6 6 0 0 1 6 -6H90.4a6 6 0 0 1 6 6V199.0Z"/><text class="bt-headtext" x="48.2" y="194.0">Condition</text><text class="bt-title" x="48.2" y="218.0">HasTarget</text></g>
+<g class="bt-node bt-action"><title>AimAndFire</title><rect class="bt-box" x="114.4" y="181.0" width="176.5" height="64.0" rx="6"/><path class="bt-head" d="M114.4 199.0V187.0a6 6 0 0 1 6 -6H284.9a6 6 0 0 1 6 6V199.0Z"/><text class="bt-headtext" x="202.6" y="194.0">Action</text><text class="bt-title" x="202.6" y="218.0">AimAndFire</text><text class="bt-port" x="202.6" y="233.0">bearing = <tspan class="bt-val">{aimBearing}</tspan></text></g>
+<g class="bt-node bt-action"><title>ThrustWithin</title><rect class="bt-box" x="308.9" y="181.0" width="176.5" height="64.0" rx="6"/><path class="bt-head" d="M308.9 199.0V187.0a6 6 0 0 1 6 -6H479.4a6 6 0 0 1 6 6V199.0Z"/><text class="bt-headtext" x="397.1" y="194.0">Action</text><text class="bt-title" x="397.1" y="218.0">ThrustWithin</text><text class="bt-port" x="397.1" y="233.0">bearing = <tspan class="bt-val">{aimBearing}</tspan></text></g>
+<g class="bt-node bt-action"><title>KeysOff</title><rect class="bt-box" x="503.4" y="181.0" width="271.0" height="64.0" rx="6"/><path class="bt-head" d="M503.4 199.0V187.0a6 6 0 0 1 6 -6H768.4a6 6 0 0 1 6 6V199.0Z"/><text class="bt-headtext" x="638.9" y="194.0">Action</text><text class="bt-title" x="638.9" y="218.0">KeysOff</text><text class="bt-port" x="638.9" y="233.0">keys = <tspan class="bt-val">stabilize,afterburner,booster</tspan></text></g>
+<g class="bt-node bt-action"><title>CountDownPhase</title><rect class="bt-box" x="792.4" y="181.0" width="134.4" height="49.0" rx="6"/><path class="bt-head" d="M792.4 199.0V187.0a6 6 0 0 1 6 -6H920.8a6 6 0 0 1 6 6V199.0Z"/><text class="bt-headtext" x="859.6" y="194.0">Action</text><text class="bt-title" x="859.6" y="218.0">CountDownPhase</text></g>
+<g class="bt-node bt-decorator"><title>ForceFailure &quot;noTarget&quot;</title><rect class="bt-box" x="952.4" y="83.0" width="119.2" height="64.0" rx="6"/><path class="bt-head" d="M952.4 101.0V89.0a6 6 0 0 1 6 -6H1065.6a6 6 0 0 1 6 6V101.0Z"/><text class="bt-headtext" x="1012.0" y="96.0">Decorator</text><text class="bt-title" x="1012.0" y="120.0">ForceFailure</text><text class="bt-name" x="1012.0" y="135.0">“noTarget”</text></g>
+<g class="bt-node bt-action"><title>ReleaseAllKeys</title><rect class="bt-box" x="944.8" y="181.0" width="134.4" height="49.0" rx="6"/><path class="bt-head" d="M944.8 199.0V187.0a6 6 0 0 1 6 -6H1073.2a6 6 0 0 1 6 6V199.0Z"/><text class="bt-headtext" x="1012.0" y="194.0">Action</text><text class="bt-title" x="1012.0" y="218.0">ReleaseAllKeys</text></g></svg></div>
+<p class="bt-src">From <code>assets/ai/trees/strafe_run.xml</code> · <a href="ai-diagrams/trees/strafe_run.xml">XML for Groot2</a></p>
+</div>
+    </section>
+
+    <section id="files">
+      <h2>Files</h2>
+      <ul class="plain">
+        <li><a href="ai-diagrams/hsm.svg">hsm.svg</a>: the state machine, drawn by Graphviz</li>
+        <li><a href="ai-diagrams/hsm.mmd">hsm.mmd</a>: the same diagram as Mermaid text (GitHub and mermaid.live draw it)</li>
+        <li><a href="ai-diagrams/hsm.json">hsm.json</a> and <a href="ai-diagrams/enemy-pilot-spec.json">enemy-pilot-spec.json</a>: the two JSON files above</li>
+        <li><a href="ai-diagrams/palette.xml">palette.xml</a> and the tree files (<a href="ai-diagrams/trees/closing.xml">closing.xml</a>, <a href="ai-diagrams/trees/engaging.xml">engaging.xml</a>, <a href="ai-diagrams/trees/evading.xml">evading.xml</a>, <a href="ai-diagrams/trees/final_stand.xml">final_stand.xml</a>, <a href="ai-diagrams/trees/fleeing.xml">fleeing.xml</a>, <a href="ai-diagrams/trees/following_orders.xml">following_orders.xml</a>, <a href="ai-diagrams/trees/strafe_run.xml">strafe_run.xml</a>): load the palette into Groot2's node models first, then open a tree</li>
+      </ul>
+      <p>To redraw after the AI changes, run <code>./gradlew aiDiagrams</code> in the defender-x repo and copy <code>build/ai-diagrams</code> and <code>assets/ai</code> here.</p>
+    </section>
+  </main>
+
+  <footer><a href="./">← Back to Jet's Wiki</a></footer>
+</body>
+</html>

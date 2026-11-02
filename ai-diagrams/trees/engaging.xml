@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Engaging (engaging): the target in sight (the Enemy AI doc's draft:
+  check visual or radar, turn to 0° and burn engines, then once close,
+  engine kills, small pivots and pot shots; team-up is tabled).
+
+  Every tick it checks it still has the target and lets go of every key,
+  then:
+  - closeIn, while farther than the knife-fight range: head for where the
+    target will be at top speed and burn once the nose is within
+    AI_THRUST_CONE. No shooting on the way in.
+  - knifeFight, once inside it: AimAndFire keeps the nose on the
+    bullet-speed lead (with this burst's aim error) and fires bursts when
+    lined up: the pot shots. Under it, a loop of maneuvers that override
+    the throttle or the nose: coast on a dead engine, jink a few degrees,
+    coast again, jink again, then a short burn. A coasting enemy that
+    drifts back out of range turns and burns in again; restarting after a
+    big swing of the nose on a dead engine lights the reverse boost and
+    drops its shield, the risk the dead-engine moves carry.
+  With no target it lets go and fails.
+
+  The range, times and angles are first guesses, tuned here.
+-->
+<root BTCPP_format="4" main_tree_to_execute="Engaging">
+  <BehaviorTree ID="Engaging">
+    <ReactiveFallback>
+      <ReactiveSequence name="engage">
+        <Fallback name="contact">
+          <HasVisual/>
+          <HasRadarContact/>
+        </Fallback>
+        <HasTarget/>
+        <ReleaseAllKeys/>
+        <ReactiveFallback>
+          <ReactiveSequence name="knifeFight">
+            <InRange range="800"/>
+            <AimAndFire bearing="{aimBearing}"/>
+            <Sequence name="maneuvers">
+              <EngineKill seconds="1.0"/>
+              <Pivot degrees="25" seconds="0.5"/>
+              <EngineKill seconds="0.6"/>
+              <Pivot degrees="25" seconds="0.5"/>
+              <Thrust seconds="0.6"/>
+            </Sequence>
+          </ReactiveSequence>
+          <ReactiveSequence name="closeIn">
+            <HeadingToTarget heading="{heading}"/>
+            <TurnToBearing heading="{heading}" bearing="{turnBearing}"/>
+            <Thrust/>
+          </ReactiveSequence>
+        </ReactiveFallback>
+      </ReactiveSequence>
+      <ForceFailure name="noTarget">
+        <ReleaseAllKeys/>
+      </ForceFailure>
+    </ReactiveFallback>
+  </BehaviorTree>
+</root>

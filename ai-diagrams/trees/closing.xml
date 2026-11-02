@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Closing (closing): the target on radar but not in sight. Head for where
+  it will be at top speed (HeadingToTarget's lead) and burn once the nose
+  is within AI_THRUST_CONE of it. With no target it lets go and fails.
+
+  Today's lead pursuit, rebuilt from leaves: the doc has no draft for
+  Closing yet, so it flies as the step 4 stand-in (CloseDistance) did.
+-->
+<root BTCPP_format="4" main_tree_to_execute="Closing">
+  <BehaviorTree ID="Closing">
+    <ReactiveFallback>
+      <ReactiveSequence name="close">
+        <HeadingToTarget heading="{heading}"/>
+        <ReleaseAllKeys/>
+        <TurnToBearing heading="{heading}" bearing="{turnBearing}"/>
+        <Thrust/>
+      </ReactiveSequence>
+      <ForceFailure name="noTarget">
+        <ReleaseAllKeys/>
+      </ForceFailure>
+    </ReactiveFallback>
+  </BehaviorTree>
+</root>

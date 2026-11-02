@@ -1,0 +1,152 @@
+{
+  "machine": "enemy_pilot",
+  "status": "draft",
+  "source": "The Enemy AI doc, \"The HSM as JSON\" (rev 1736): the spec HsmSpecTest checks the Kotlin machine against. Keep it in step with the doc.",
+  "transition_rules": {
+    "interrupting_parents": ["morale_good", "morale_broken"],
+    "interrupt_depth": "direct children only",
+    "order": ["interrupting parent's rules", "innermost state's rules"],
+    "within_a_state": "first true rule in listed order",
+    "to_active_state": "ignored",
+    "initial_state": "morale_good"
+  },
+  "percepts": {
+    "have_visual":     { "type": "bool", "note": "Today's nose cone; stays on for a tunable few seconds after losing sight" },
+    "radar_signature": { "type": "bool", "note": "Listed as 'radar indicator' among the percepts. Stays on for LOST_TARGET_TICKS (2 s) after contact drops; perception keeps the countdown" },
+    "have_orders":     { "type": "bool", "note": "True while the enemy holds an order" },
+    "order":           { "type": "record", "fields": { "kind": "heading", "bearing": "radians" }, "set_by": "Level Conductor; a spawn stand-in for the demo, which re-aims the bearing at the player every few seconds", "note": "Only kind 'heading' for now. Later kinds, such as engaging another target, add fields without changing the trees" },
+    "on_crash_course": { "type": "bool" },
+    "under_fire":      { "type": "bool", "level": "under_fire_level = clamp(under_fire_level - under_fire_decay_per_second / 120 + under_fire_gain * near_miss, 0, 1)", "on_when": "under_fire_level >= under_fire_enter", "off_when": "under_fire_level <= under_fire_exit", "note": "Each near miss the pilot notices adds under_fire_gain; the level decays at a constant rate. Two thresholds, so an enemy keeps evading until it has gone a while without a close shot. Better pilots notice more of the shots" },
+    "damage_taken":    { "type": "bool", "latched": true, "note": "Any hull damage, including collisions with rocks and ships. Once on, stays on: morale only breaks one way" },
+    "outnumbered":     { "type": "int", "note": "0 or 1" },
+    "near_miss":       { "type": "int", "note": "1 on a tick with a noticed close round, else 0: a near miss, a round that crossed the hit box but failed the hit roll, or a hit" },
+    "outgunned":       { "type": "number", "formula": "outgunned * outgunned_decay + (1 - outgunned_decay) * outnumbered * near_miss", "note": "Climbs from 0 while outnumbered and taking near misses, decays toward 0 otherwise, never leaves 0..1. Feeds morale; not used by any transition yet" },
+    "lost_pursuer":    { "type": "bool", "latched": true, "note": "Turns on once a fleeing enemy has left the player's camera view as currently framed (zoom included), and stays on so a Final Stand enemy isn't sent back to Fleeing" },
+    "morale_type":     { "type": "enum", "values": ["fights_to_death", "flee_for_good", "flee_then_stand"], "fixed_at_spawn": true, "note": "How much the pilot feels it can take on; rules read it like any other percept" }
+  },
+  "params": {
+    "outgunned_decay": null,
+    "under_fire_gain": 0.4,
+    "under_fire_decay_per_second": 0.5,
+    "under_fire_enter": 1.0,
+    "under_fire_exit": 0.0
+  },
+  "params_note": "under_fire_gain and under_fire_decay_per_second are starting values for every NPC through step 4; both stay tunable, later per NPC type and difficulty",
+  "states": [
+    {
+      "id": "morale_good",
+      "transitions": [
+        { "to": null,               "when": "!have_visual && !radar_signature && !have_orders" },
+        { "to": "morale_broken",    "when": "damage_taken && morale_type != 'fights_to_death'" },
+        { "to": "closing",          "when": "!have_visual && radar_signature" },
+        { "to": "engaging",         "when": "have_visual" },
+        { "to": "following_orders", "when": "!have_visual && !radar_signature && have_orders" }
+      ],
+      "states": [
+        {
+          "id": "following_orders"
+        },
+        {
+          "id": "closing",
+          "transitions": [
+            { "to": "closing.evading_obstacle", "when": "on_crash_course" },
+            { "to": "closing.evading_enemy",    "when": "under_fire" }
+          ],
+          "states": [
+            {
+              "id": "closing.evading_obstacle",
+              "transitions": [
+                { "to": "closing", "when": "!on_crash_course" }
+              ]
+            },
+            {
+              "id": "closing.evading_enemy",
+              "note": "Enemies pick targets as the player does, so one can be chasing and under fire at once",
+              "transitions": [
+                { "to": "closing", "when": "!under_fire", "note": "Smarter NPCs might try attacking instead" }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "engaging",
+          "behavior_tree": "Engaging",
+          "transitions": [
+            { "to": "engaging.evading_obstacle", "when": "on_crash_course" },
+            { "to": "engaging.evading_enemy",    "when": "under_fire" }
+          ],
+          "states": [
+            {
+              "id": "engaging.evading_obstacle",
+              "transitions": [
+                { "to": "engaging", "when": "!on_crash_course" }
+              ]
+            },
+            {
+              "id": "engaging.evading_enemy",
+              "note": "Enemies pick targets as the player does, so one can be chasing and under fire at once",
+              "transitions": [
+                { "to": "engaging", "when": "!under_fire", "note": "Smarter NPCs might try attacking instead" }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "morale_broken",
+      "transitions": [
+        { "to": null,      "when": "!have_visual && !radar_signature" },
+        { "to": "fleeing", "when": "(have_visual || radar_signature) && !lost_pursuer" }
+      ],
+      "states": [
+        {
+          "id": "fleeing",
+          "behavior_tree": "Fleeing",
+          "transitions": [
+            { "to": "fleeing.evading_obstacle", "when": "on_crash_course" },
+            { "to": "fleeing.evading_enemy",    "when": "under_fire" },
+            { "to": "final_stand",              "when": "lost_pursuer && morale_type == 'flee_then_stand'" }
+          ],
+          "states": [
+            {
+              "id": "fleeing.evading_obstacle",
+              "transitions": [
+                { "to": "fleeing", "when": "!on_crash_course" }
+              ]
+            },
+            {
+              "id": "fleeing.evading_enemy",
+              "note": "Enemies pick targets as the player does, so one can be chasing and under fire at once",
+              "transitions": [
+                { "to": "fleeing", "when": "!under_fire" }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "final_stand",
+          "transitions": [
+            { "to": "final_stand.evading_obstacle", "when": "on_crash_course" },
+            { "to": "final_stand.evading_enemy",    "when": "under_fire" }
+          ],
+          "states": [
+            {
+              "id": "final_stand.evading_obstacle",
+              "transitions": [
+                { "to": "final_stand", "when": "!on_crash_course" }
+              ]
+            },
+            {
+              "id": "final_stand.evading_enemy",
+              "note": "Enemies pick targets as the player does, so one can be chasing and under fire at once",
+              "transitions": [
+                { "to": "final_stand", "when": "!under_fire" }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  The evading states (the Enemy AI doc, "The contract between a state and
+  its tree"): one EvadingObstacle and one EvadingEnemy tree serve all three
+  parents, and each state's own tree is a thin wrapper calling the shared
+  one as a SubTree. Final Stand evades the same way as the others.
+
+  The shared trees start as one leaf each, wrapping the step 4 stand-ins
+  key for key; their maneuvers (per pilot skill, say) grow here.
+-->
+<root BTCPP_format="4">
+  <!-- A collision coming: swerve round it, or turn and brake before a rock dead ahead.
+       SUCCESS once the path has stayed clear for AVOID_CLEAR_TICKS. -->
+  <BehaviorTree ID="EvadingObstacle">
+    <AvoidObstacle/>
+  </BehaviorTree>
+
+  <!-- Under fire: the boost combo off the shooter's aim line, burning straight between combos. -->
+  <BehaviorTree ID="EvadingEnemy">
+    <TurnAndBurn/>
+  </BehaviorTree>
+
+  <BehaviorTree ID="ClosingEvadingObstacle">
+    <SubTree ID="EvadingObstacle"/>
+  </BehaviorTree>
+  <BehaviorTree ID="ClosingEvadingEnemy">
+    <SubTree ID="EvadingEnemy"/>
+  </BehaviorTree>
+
+  <BehaviorTree ID="EngagingEvadingObstacle">
+    <SubTree ID="EvadingObstacle"/>
+  </BehaviorTree>
+  <BehaviorTree ID="EngagingEvadingEnemy">
+    <SubTree ID="EvadingEnemy"/>
+  </BehaviorTree>
+
+  <BehaviorTree ID="FleeingEvadingObstacle">
+    <SubTree ID="EvadingObstacle"/>
+  </BehaviorTree>
+  <BehaviorTree ID="FleeingEvadingEnemy">
+    <SubTree ID="EvadingEnemy"/>
+  </BehaviorTree>
+
+  <BehaviorTree ID="FinalStandEvadingObstacle">
+    <SubTree ID="EvadingObstacle"/>
+  </BehaviorTree>
+  <BehaviorTree ID="FinalStandEvadingEnemy">
+    <SubTree ID="EvadingEnemy"/>
+  </BehaviorTree>
+</root>

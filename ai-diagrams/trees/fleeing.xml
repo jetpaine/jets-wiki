@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Fleeing (fleeing): morale broken, run (the Enemy AI doc's draft: check
+  visual or radar, turn 180° away, burn engines).
+
+  Every tick it takes the heading straight away from the target and lets
+  go of every key, then:
+  - Breakaway: a broken fighter's boost, afterburner and booster on while
+    it lasts.
+  - Reverse: if turning in-plane onto the way out would show it upside
+    down to its pursuer, it yaws round instead, engine on (issue #34). It
+    holds the sequence until the reversal ends.
+  - Thrust and TurnToBearing: the engine burns the whole time, turns
+    included (issue #59), leaving a vapor trail to follow and keeping the
+    turn going, which is when a shot is least likely to hit.
+  With no target it lets go and fails.
+-->
+<root BTCPP_format="4" main_tree_to_execute="Fleeing">
+  <BehaviorTree ID="Fleeing">
+    <ReactiveFallback>
+      <ReactiveSequence name="flee">
+        <HeadingAwayFromTarget heading="{heading}"/>
+        <ReleaseAllKeys/>
+        <Breakaway/>
+        <Reverse heading="{heading}"/>
+        <Thrust/>
+        <TurnToBearing heading="{heading}" bearing="{turnBearing}"/>
+      </ReactiveSequence>
+      <ForceFailure name="noTarget">
+        <ReleaseAllKeys/>
+      </ForceFailure>
+    </ReactiveFallback>
+  </BehaviorTree>
+</root>

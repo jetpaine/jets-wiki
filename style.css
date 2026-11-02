@@ -244,3 +244,38 @@ nav.toc a::before { content: counter(toc) ". "; color: var(--muted); font-weight
 .roadmap { display: block; width: 100%; min-width: 620px; height: auto; font-family: "Nunito", system-ui, sans-serif; }
 .roadmap-fig figcaption { color: var(--muted); font-size: 0.88rem; font-style: italic; margin-top: 6px; text-align: center; }
 .roadmap.stack { min-width: 560px; }
+
+/* Enemy AI diagrams page */
+:root { --bt-control: #7c3aed; --bt-decorator: #0f766e; --bt-condition: #15803d; --bt-action: #c2410c; --bt-subtree: #6b4a33; }
+@media (prefers-color-scheme: dark) {
+  :root { --bt-control: #a78bfa; --bt-decorator: #2dd4bf; --bt-condition: #4ade80; --bt-action: #fb923c; --bt-subtree: #c9b29a; }
+}
+.gv-scroll { overflow-x: auto; background: #fff; border: 1px solid var(--border); border-radius: 10px; padding: 8px; margin: 8px 0 6px; }
+.gv-scroll svg.gv { display: block; max-width: none; }
+.bt-src { font-size: 0.85rem; color: var(--muted); }
+.bt-note { color: var(--muted); font-style: italic; }
+details.json { margin: 0 0 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg-deep); }
+details.json summary { cursor: pointer; padding: 10px 14px; font-weight: 700; }
+details.json pre { margin: 0; border: none; border-top: 1px solid var(--border); border-radius: 0 0 10px 10px; max-height: 520px; overflow: auto; }
+details.json pre code { white-space: pre; }
+.bt-legend { display: flex; flex-wrap: wrap; gap: 8px 14px; margin: 0 0 16px; font-size: 0.85rem; }
+.bt-key { border-left: 12px solid var(--k); padding-left: 6px; }
+.bt-key.bt-control { --k: var(--bt-control); } .bt-key.bt-decorator { --k: var(--bt-decorator); }
+.bt-key.bt-condition { --k: var(--bt-condition); } .bt-key.bt-action { --k: var(--bt-action); }
+.bt-key.bt-subtree { --k: var(--bt-subtree); }
+.bt-tree { border-top: 1px dashed var(--border); padding-top: 6px; margin-top: 18px; scroll-margin-top: 12px; }
+.bt-tree:target h3 { text-decoration: underline wavy var(--accent); }
+.bt-scroll { overflow-x: auto; padding: 4px 0 8px; }
+.bt-svg { display: block; margin: 0 auto; max-width: none; font-family: "Nunito", system-ui, sans-serif; }
+.bt-node { --k: var(--bt-action); }
+.bt-control { --k: var(--bt-control); } .bt-decorator { --k: var(--bt-decorator); }
+.bt-condition { --k: var(--bt-condition); } .bt-subtree { --k: var(--bt-subtree); }
+.bt-box { fill: var(--card); stroke: var(--k); stroke-width: 1.5; }
+.bt-head { fill: var(--k); }
+.bt-headtext { fill: var(--card); font-size: 11px; font-weight: 700; text-anchor: middle; }
+.bt-title { fill: var(--fg); font-size: 13px; font-weight: 700; text-anchor: middle; }
+.bt-title a { fill: var(--k); text-decoration: underline; }
+.bt-name { fill: var(--muted); font-size: 12px; font-style: italic; text-anchor: middle; }
+.bt-port { fill: var(--muted); font-size: 11px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; text-anchor: middle; }
+.bt-val { fill: var(--fg); }
+.bt-edge { fill: none; stroke: var(--muted); stroke-width: 1.25; }

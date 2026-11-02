@@ -1,0 +1,52 @@
+stateDiagram-v2
+    state MoraleGood {
+        state "following_orders" as FollowingOrders
+        state Closing {
+            state "closing.evading_obstacle" as ClosingEvadingObstacle
+            state "closing.evading_enemy" as ClosingEvadingEnemy
+        }
+        state Engaging {
+            state "engaging.evading_obstacle" as EngagingEvadingObstacle
+            state "engaging.evading_enemy" as EngagingEvadingEnemy
+        }
+        [*] --> Engaging : p.haveVisual
+        [*] --> Closing : p.radarSignature
+        [*] --> FollowingOrders : !p.haveVisual && !p.radarSignature
+    }
+    state MoraleBroken {
+        state Fleeing {
+            state "fleeing.evading_obstacle" as FleeingEvadingObstacle
+            state "fleeing.evading_enemy" as FleeingEvadingEnemy
+        }
+        state FinalStand {
+            state "final_stand.evading_obstacle" as FinalStandEvadingObstacle
+            state "final_stand.evading_enemy" as FinalStandEvadingEnemy
+        }
+        [*] --> FinalStand : p.lostPursuer && p.moraleType == MoraleType.FLEE_THEN_STAND
+        [*] --> Fleeing : !(p.lostPursuer && p.moraleType == MoraleType.FLEE_THEN_STAND)
+    }
+    state "no_state" as NoState
+    MoraleGood --> NoState : !p.haveVisual && !p.radarSignature && !p.haveOrders
+    MoraleGood --> MoraleBroken : p.damageTaken && p.moraleType != MoraleType.FIGHTS_TO_DEATH
+    MoraleGood --> Closing : !p.haveVisual && p.radarSignature
+    MoraleGood --> Engaging : p.haveVisual
+    MoraleGood --> FollowingOrders : !p.haveVisual && !p.radarSignature && p.haveOrders
+    Closing --> ClosingEvadingObstacle : p.onCrashCourse
+    Closing --> ClosingEvadingEnemy : p.underFire
+    ClosingEvadingObstacle --> Closing : !p.onCrashCourse
+    ClosingEvadingEnemy --> Closing : !p.underFire
+    Engaging --> EngagingEvadingObstacle : p.onCrashCourse
+    Engaging --> EngagingEvadingEnemy : p.underFire
+    EngagingEvadingObstacle --> Engaging : !p.onCrashCourse
+    EngagingEvadingEnemy --> Engaging : !p.underFire
+    MoraleBroken --> NoState : !p.haveVisual && !p.radarSignature
+    MoraleBroken --> Fleeing : (p.haveVisual || p.radarSignature) && !p.lostPursuer
+    Fleeing --> FleeingEvadingObstacle : p.onCrashCourse
+    Fleeing --> FleeingEvadingEnemy : p.underFire
+    Fleeing --> FinalStand : p.lostPursuer && p.moraleType == MoraleType.FLEE_THEN_STAND
+    FleeingEvadingObstacle --> Fleeing : !p.onCrashCourse
+    FleeingEvadingEnemy --> Fleeing : !p.underFire
+    FinalStand --> FinalStandEvadingObstacle : p.onCrashCourse
+    FinalStand --> FinalStandEvadingEnemy : p.underFire
+    FinalStandEvadingObstacle --> FinalStand : !p.onCrashCourse
+    FinalStandEvadingEnemy --> FinalStand : !p.underFire

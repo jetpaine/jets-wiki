@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Generated from NodeRegistry (ai/bt/Leaves.kt) by ./gradlew btPalette. Don't edit it here.
+  Load it into Groot2 to get the game's nodes.
+
+  Blackboard keys, for ports written as {key}:
+    aimBearing (double, read-write): Bearing to the current aim point (radians)
+    heading (double, read-write): World heading a tree is flying (radians), from a heading leaf
+    turnBearing (double, read-write): Bearing still to turn onto the heading (radians), from TurnToBearing
+-->
+<root BTCPP_format="4">
+  <TreeNodesModel>
+    <Action ID="AimAndFire">
+      <output_port name="bearing" type="double">Bearing to the aim point (radians)</output_port>
+    </Action>
+    <Action ID="AvoidObstacle"/>
+    <Action ID="Breakaway"/>
+    <Action ID="CountDownPhase"/>
+    <Action ID="EngineKill">
+      <input_port name="seconds" type="double">How long (seconds)</input_port>
+    </Action>
+    <Action ID="FireBurst"/>
+    <Condition ID="HasRadarContact"/>
+    <Condition ID="HasTarget"/>
+    <Condition ID="HasVisual"/>
+    <Action ID="HeadingAwayFromTarget">
+      <output_port name="heading" type="double">World heading (radians)</output_port>
+    </Action>
+    <Action ID="HeadingToTarget">
+      <output_port name="heading" type="double">World heading (radians)</output_port>
+    </Action>
+    <Condition ID="InRange">
+      <input_port name="range" type="double">World units; defaults to ENEMY_FIRE_RANGE</input_port>
+    </Condition>
+    <Action ID="KeysOff">
+      <input_port name="keys" type="std::string">Comma-separated: rotateCw,rotateCcw,thrust,fire,stabilize,afterburner,booster,reverse</input_port>
+    </Action>
+    <Action ID="OrderHeading">
+      <output_port name="heading" type="double">World heading (radians)</output_port>
+    </Action>
+    <Action ID="Pivot">
+      <input_port name="degrees" type="double">How far to swing (degrees)</input_port>
+      <input_port name="seconds" type="double">Most time to take (seconds)</input_port>
+    </Action>
+    <Action ID="ReleaseAllKeys"/>
+    <Action ID="Reverse">
+      <input_port name="heading" type="double">World heading it's about to fly (radians)</input_port>
+    </Action>
+    <Action ID="Thrust">
+      <input_port name="afterburner" type="bool">Light the afterburner too</input_port>
+      <input_port name="booster" type="bool">Use the booster too</input_port>
+      <input_port name="seconds" type="double">Burn this long (seconds); 0, the default, is just this tick</input_port>
+    </Action>
+    <Action ID="ThrustWithin">
+      <input_port name="bearing" type="double">Bearing to line up on (radians)</input_port>
+      <input_port name="cone" type="double">Half-angle of the cone (radians); defaults to AI_THRUST_CONE</input_port>
+    </Action>
+    <Action ID="TurnAndBurn"/>
+    <Action ID="TurnToBearing">
+      <input_port name="heading" type="double">World heading to turn onto (radians)</input_port>
+      <input_port name="tolerance" type="double">Close enough (radians); defaults to AI_THRUST_CONE</input_port>
+      <output_port name="bearing" type="double">Bearing still to turn (radians)</output_port>
+    </Action>
+  </TreeNodesModel>
+</root>
