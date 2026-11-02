@@ -77,6 +77,7 @@
       <a href="#decision">Decision layer (HSM)</a>
       <a href="#hsm-json">HSM as JSON</a>
       <a href="#acting">Acting layer (behavior trees)</a>
+      <a href="#bt-xml">Trees as XML</a>
       <a href="#files">Files</a>
     </nav>
   </header>
@@ -411,6 +412,362 @@
 <ul class="bt-outline"><li class="bt-control"><div class="bt-row"><span class="bt-badge">⟳?</span> <span class="bt-t">Reactive Fallback</span></div><ul><li class="bt-control"><div class="bt-row"><span class="bt-badge">⟳→</span> <span class="bt-t">Reactive Sequence</span> <span class="bt-n">“pass”</span></div><ul><li class="bt-condition"><div class="bt-row"><span class="bt-badge">Condition</span> <span class="bt-t">HasTarget</span></div></li><li class="bt-action"><div class="bt-row"><span class="bt-badge">Action</span> <span class="bt-t">AimAndFire</span> <code class="bt-p">bearing = {aimBearing}</code></div></li><li class="bt-action"><div class="bt-row"><span class="bt-badge">Action</span> <span class="bt-t">ThrustWithin</span> <code class="bt-p">bearing = {aimBearing}</code></div></li><li class="bt-action"><div class="bt-row"><span class="bt-badge">Action</span> <span class="bt-t">KeysOff</span> <code class="bt-p">keys = stabilize,afterburner,booster</code></div></li><li class="bt-action"><div class="bt-row"><span class="bt-badge">Action</span> <span class="bt-t">CountDownPhase</span></div></li></ul></li><li class="bt-decorator"><div class="bt-row"><span class="bt-badge">Decorator</span> <span class="bt-t">ForceFailure</span> <span class="bt-n">“noTarget”</span></div><ul><li class="bt-action"><div class="bt-row"><span class="bt-badge">Action</span> <span class="bt-t">ReleaseAllKeys</span></div></li></ul></li></ul></li></ul>
 <p class="bt-src">From <code>assets/ai/trees/strafe_run.xml</code> · <a href="ai-diagrams/trees/strafe_run.xml">XML for Groot2</a></p>
 </div>
+    </section>
+
+    <section id="bt-xml">
+      <h2>The trees as XML</h2>
+      <p>The tree files are the plaintext form of the trees: BehaviorTree.CPP v4 XML, the format Groot2 opens and saves, and what the game loads at startup. They're shown here exactly as they are in <code>assets/ai/trees</code>, comments included. <code>palette.xml</code> is generated from the game's node registry (<code>./gradlew btPalette</code>) and lists every node a tree can use, with its ports. Load it into Groot2's node models before opening a tree.</p>
+      <details class="json">
+        <summary><code>following_orders.xml</code>, tree FollowingOrders · <a href="ai-diagrams/trees/following_orders.xml" download>download</a></summary>
+        <pre><code>&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;
+&lt;!--
+  FollowingOrders (following_orders): no contact, but an order. Turn onto
+  the order&#x27;s heading and burn along it (the Enemy AI doc&#x27;s draft, &quot;Trees
+  with no draft yet&quot;). The stand-in conductor re-aims the heading at the
+  player every few seconds, so an enemy that loses contact keeps coming.
+
+  Every tick it first lets go of everything, then presses only what this
+  tick needs: the turn always, the engine once the nose is within
+  AI_THRUST_CONE of the heading. With no order it lets go and fails.
+--&gt;
+&lt;root BTCPP_format=&quot;4&quot; main_tree_to_execute=&quot;FollowingOrders&quot;&gt;
+  &lt;BehaviorTree ID=&quot;FollowingOrders&quot;&gt;
+    &lt;ReactiveFallback&gt;
+      &lt;ReactiveSequence name=&quot;follow&quot;&gt;
+        &lt;OrderHeading heading=&quot;{heading}&quot;/&gt;
+        &lt;ReleaseAllKeys/&gt;
+        &lt;TurnToBearing heading=&quot;{heading}&quot; bearing=&quot;{turnBearing}&quot;/&gt;
+        &lt;Thrust/&gt;
+      &lt;/ReactiveSequence&gt;
+      &lt;ForceFailure name=&quot;noOrder&quot;&gt;
+        &lt;ReleaseAllKeys/&gt;
+      &lt;/ForceFailure&gt;
+    &lt;/ReactiveFallback&gt;
+  &lt;/BehaviorTree&gt;
+&lt;/root&gt;</code></pre>
+      </details>
+      <details class="json">
+        <summary><code>closing.xml</code>, tree Closing · <a href="ai-diagrams/trees/closing.xml" download>download</a></summary>
+        <pre><code>&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;
+&lt;!--
+  Closing (closing): the target on radar but not in sight. Head for where
+  it will be at top speed (HeadingToTarget&#x27;s lead) and burn once the nose
+  is within AI_THRUST_CONE of it. With no target it lets go and fails.
+
+  Today&#x27;s lead pursuit, rebuilt from leaves: the doc has no draft for
+  Closing yet, so it flies as the step 4 stand-in (CloseDistance) did.
+--&gt;
+&lt;root BTCPP_format=&quot;4&quot; main_tree_to_execute=&quot;Closing&quot;&gt;
+  &lt;BehaviorTree ID=&quot;Closing&quot;&gt;
+    &lt;ReactiveFallback&gt;
+      &lt;ReactiveSequence name=&quot;close&quot;&gt;
+        &lt;HeadingToTarget heading=&quot;{heading}&quot;/&gt;
+        &lt;ReleaseAllKeys/&gt;
+        &lt;TurnToBearing heading=&quot;{heading}&quot; bearing=&quot;{turnBearing}&quot;/&gt;
+        &lt;Thrust/&gt;
+      &lt;/ReactiveSequence&gt;
+      &lt;ForceFailure name=&quot;noTarget&quot;&gt;
+        &lt;ReleaseAllKeys/&gt;
+      &lt;/ForceFailure&gt;
+    &lt;/ReactiveFallback&gt;
+  &lt;/BehaviorTree&gt;
+&lt;/root&gt;</code></pre>
+      </details>
+      <details class="json">
+        <summary><code>engaging.xml</code>, tree Engaging · <a href="ai-diagrams/trees/engaging.xml" download>download</a></summary>
+        <pre><code>&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;
+&lt;!--
+  Engaging (engaging): the target in sight (the Enemy AI doc&#x27;s draft:
+  check visual or radar, turn to 0° and burn engines, then once close,
+  engine kills, small pivots and pot shots; team-up is tabled).
+
+  Every tick it checks it still has the target and lets go of every key,
+  then:
+  - closeIn, while farther than the knife-fight range: head for where the
+    target will be at top speed and burn once the nose is within
+    AI_THRUST_CONE. No shooting on the way in.
+  - knifeFight, once inside it: AimAndFire keeps the nose on the
+    bullet-speed lead (with this burst&#x27;s aim error) and fires bursts when
+    lined up: the pot shots. Under it, a loop of maneuvers that override
+    the throttle or the nose: coast on a dead engine, jink a few degrees,
+    coast again, jink again, then a short burn. A coasting enemy that
+    drifts back out of range turns and burns in again; restarting after a
+    big swing of the nose on a dead engine lights the reverse boost and
+    drops its shield, the risk the dead-engine moves carry.
+  With no target it lets go and fails.
+
+  The range, times and angles are first guesses, tuned here.
+--&gt;
+&lt;root BTCPP_format=&quot;4&quot; main_tree_to_execute=&quot;Engaging&quot;&gt;
+  &lt;BehaviorTree ID=&quot;Engaging&quot;&gt;
+    &lt;ReactiveFallback&gt;
+      &lt;ReactiveSequence name=&quot;engage&quot;&gt;
+        &lt;Fallback name=&quot;contact&quot;&gt;
+          &lt;HasVisual/&gt;
+          &lt;HasRadarContact/&gt;
+        &lt;/Fallback&gt;
+        &lt;HasTarget/&gt;
+        &lt;ReleaseAllKeys/&gt;
+        &lt;ReactiveFallback&gt;
+          &lt;ReactiveSequence name=&quot;knifeFight&quot;&gt;
+            &lt;InRange range=&quot;800&quot;/&gt;
+            &lt;AimAndFire bearing=&quot;{aimBearing}&quot;/&gt;
+            &lt;Sequence name=&quot;maneuvers&quot;&gt;
+              &lt;EngineKill seconds=&quot;1.0&quot;/&gt;
+              &lt;Pivot degrees=&quot;25&quot; seconds=&quot;0.5&quot;/&gt;
+              &lt;EngineKill seconds=&quot;0.6&quot;/&gt;
+              &lt;Pivot degrees=&quot;25&quot; seconds=&quot;0.5&quot;/&gt;
+              &lt;Thrust seconds=&quot;0.6&quot;/&gt;
+            &lt;/Sequence&gt;
+          &lt;/ReactiveSequence&gt;
+          &lt;ReactiveSequence name=&quot;closeIn&quot;&gt;
+            &lt;HeadingToTarget heading=&quot;{heading}&quot;/&gt;
+            &lt;TurnToBearing heading=&quot;{heading}&quot; bearing=&quot;{turnBearing}&quot;/&gt;
+            &lt;Thrust/&gt;
+          &lt;/ReactiveSequence&gt;
+        &lt;/ReactiveFallback&gt;
+      &lt;/ReactiveSequence&gt;
+      &lt;ForceFailure name=&quot;noTarget&quot;&gt;
+        &lt;ReleaseAllKeys/&gt;
+      &lt;/ForceFailure&gt;
+    &lt;/ReactiveFallback&gt;
+  &lt;/BehaviorTree&gt;
+&lt;/root&gt;</code></pre>
+      </details>
+      <details class="json">
+        <summary><code>fleeing.xml</code>, tree Fleeing · <a href="ai-diagrams/trees/fleeing.xml" download>download</a></summary>
+        <pre><code>&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;
+&lt;!--
+  Fleeing (fleeing): morale broken, run (the Enemy AI doc&#x27;s draft: check
+  visual or radar, turn 180° away, burn engines).
+
+  Every tick it takes the heading straight away from the target and lets
+  go of every key, then:
+  - Breakaway: a broken fighter&#x27;s boost, afterburner and booster on while
+    it lasts.
+  - Reverse: if turning in-plane onto the way out would show it upside
+    down to its pursuer, it yaws round instead, engine on (issue #34). It
+    holds the sequence until the reversal ends.
+  - Thrust and TurnToBearing: the engine burns the whole time, turns
+    included (issue #59), leaving a vapor trail to follow and keeping the
+    turn going, which is when a shot is least likely to hit.
+  With no target it lets go and fails.
+--&gt;
+&lt;root BTCPP_format=&quot;4&quot; main_tree_to_execute=&quot;Fleeing&quot;&gt;
+  &lt;BehaviorTree ID=&quot;Fleeing&quot;&gt;
+    &lt;ReactiveFallback&gt;
+      &lt;ReactiveSequence name=&quot;flee&quot;&gt;
+        &lt;HeadingAwayFromTarget heading=&quot;{heading}&quot;/&gt;
+        &lt;ReleaseAllKeys/&gt;
+        &lt;Breakaway/&gt;
+        &lt;Reverse heading=&quot;{heading}&quot;/&gt;
+        &lt;Thrust/&gt;
+        &lt;TurnToBearing heading=&quot;{heading}&quot; bearing=&quot;{turnBearing}&quot;/&gt;
+      &lt;/ReactiveSequence&gt;
+      &lt;ForceFailure name=&quot;noTarget&quot;&gt;
+        &lt;ReleaseAllKeys/&gt;
+      &lt;/ForceFailure&gt;
+    &lt;/ReactiveFallback&gt;
+  &lt;/BehaviorTree&gt;
+&lt;/root&gt;</code></pre>
+      </details>
+      <details class="json">
+        <summary><code>final_stand.xml</code>, tree FinalStand · <a href="ai-diagrams/trees/final_stand.xml" download>download</a></summary>
+        <pre><code>&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;
+&lt;!--
+  FinalStand (final_stand): a flee-then-stand enemy that has shaken off its
+  pursuer turns back to fight to the end (the Enemy AI doc, &quot;Trees with no
+  draft yet&quot;): a Starbuck 180 on a dead engine to try for a zero, then
+  regular engaging, reusing the Engaging tree as a subtree.
+
+  - run: it keeps fleeing, engine burning (the Fleeing tree), until the
+    pursuer has caught up to gun range (ENEMY_FIRE_RANGE). A pursuer that
+    never catches up never gets the stand. Fleeing reports SUCCESS once
+    lined up on its way out, so a Repeat keeps it going.
+  - starbuck: then it kills the engine, and AimAndFire swings the nose
+    round onto the pursuer&#x27;s lead and fires bursts while it coasts on
+    backward, for 2.5 s. No restart inside the move, so no reverse boost
+    and no shield drop there.
+  - then Engaging, for as long as the stand lasts. Its first burn after
+    the dead-engine swing is a restart, so it lights the reverse boost
+    and drops the shield, as for any pilot.
+  Each time the state is entered (after an evasion, say) it starts over.
+  The 180&#x27;s length is a first guess, tuned here.
+--&gt;
+&lt;root BTCPP_format=&quot;4&quot; main_tree_to_execute=&quot;FinalStand&quot;&gt;
+  &lt;BehaviorTree ID=&quot;FinalStand&quot;&gt;
+    &lt;Sequence&gt;
+      &lt;ForceSuccess&gt;
+        &lt;Sequence name=&quot;runThenTurn&quot;&gt;
+          &lt;ReactiveFallback name=&quot;run&quot;&gt;
+            &lt;InRange/&gt;
+            &lt;Repeat num_cycles=&quot;-1&quot;&gt;
+              &lt;SubTree ID=&quot;Fleeing&quot;/&gt;
+            &lt;/Repeat&gt;
+          &lt;/ReactiveFallback&gt;
+          &lt;ReactiveSequence name=&quot;starbuck&quot;&gt;
+            &lt;HasTarget/&gt;
+            &lt;ReleaseAllKeys/&gt;
+            &lt;AimAndFire bearing=&quot;{aimBearing}&quot;/&gt;
+            &lt;EngineKill seconds=&quot;2.5&quot;/&gt;
+          &lt;/ReactiveSequence&gt;
+        &lt;/Sequence&gt;
+      &lt;/ForceSuccess&gt;
+      &lt;SubTree ID=&quot;Engaging&quot;/&gt;
+    &lt;/Sequence&gt;
+  &lt;/BehaviorTree&gt;
+&lt;/root&gt;</code></pre>
+      </details>
+      <details class="json">
+        <summary><code>evading.xml</code>, 10 trees (the shared evading trees and their wrappers) · <a href="ai-diagrams/trees/evading.xml" download>download</a></summary>
+        <pre><code>&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;
+&lt;!--
+  The evading states (the Enemy AI doc, &quot;The contract between a state and
+  its tree&quot;): one EvadingObstacle and one EvadingEnemy tree serve all three
+  parents, and each state&#x27;s own tree is a thin wrapper calling the shared
+  one as a SubTree. Final Stand evades the same way as the others.
+
+  The shared trees start as one leaf each, wrapping the step 4 stand-ins
+  key for key; their maneuvers (per pilot skill, say) grow here.
+--&gt;
+&lt;root BTCPP_format=&quot;4&quot;&gt;
+  &lt;!-- A collision coming: swerve round it, or turn and brake before a rock dead ahead.
+       SUCCESS once the path has stayed clear for AVOID_CLEAR_TICKS. --&gt;
+  &lt;BehaviorTree ID=&quot;EvadingObstacle&quot;&gt;
+    &lt;AvoidObstacle/&gt;
+  &lt;/BehaviorTree&gt;
+
+  &lt;!-- Under fire: the boost combo off the shooter&#x27;s aim line, burning straight between combos. --&gt;
+  &lt;BehaviorTree ID=&quot;EvadingEnemy&quot;&gt;
+    &lt;TurnAndBurn/&gt;
+  &lt;/BehaviorTree&gt;
+
+  &lt;BehaviorTree ID=&quot;ClosingEvadingObstacle&quot;&gt;
+    &lt;SubTree ID=&quot;EvadingObstacle&quot;/&gt;
+  &lt;/BehaviorTree&gt;
+  &lt;BehaviorTree ID=&quot;ClosingEvadingEnemy&quot;&gt;
+    &lt;SubTree ID=&quot;EvadingEnemy&quot;/&gt;
+  &lt;/BehaviorTree&gt;
+
+  &lt;BehaviorTree ID=&quot;EngagingEvadingObstacle&quot;&gt;
+    &lt;SubTree ID=&quot;EvadingObstacle&quot;/&gt;
+  &lt;/BehaviorTree&gt;
+  &lt;BehaviorTree ID=&quot;EngagingEvadingEnemy&quot;&gt;
+    &lt;SubTree ID=&quot;EvadingEnemy&quot;/&gt;
+  &lt;/BehaviorTree&gt;
+
+  &lt;BehaviorTree ID=&quot;FleeingEvadingObstacle&quot;&gt;
+    &lt;SubTree ID=&quot;EvadingObstacle&quot;/&gt;
+  &lt;/BehaviorTree&gt;
+  &lt;BehaviorTree ID=&quot;FleeingEvadingEnemy&quot;&gt;
+    &lt;SubTree ID=&quot;EvadingEnemy&quot;/&gt;
+  &lt;/BehaviorTree&gt;
+
+  &lt;BehaviorTree ID=&quot;FinalStandEvadingObstacle&quot;&gt;
+    &lt;SubTree ID=&quot;EvadingObstacle&quot;/&gt;
+  &lt;/BehaviorTree&gt;
+  &lt;BehaviorTree ID=&quot;FinalStandEvadingEnemy&quot;&gt;
+    &lt;SubTree ID=&quot;EvadingEnemy&quot;/&gt;
+  &lt;/BehaviorTree&gt;
+&lt;/root&gt;</code></pre>
+      </details>
+      <details class="json">
+        <summary><code>strafe_run.xml</code>, tree StrafeRun · <a href="ai-diagrams/trees/strafe_run.xml" download>download</a></summary>
+        <pre><code>&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;
+&lt;!--
+  StrafeRun: commit to a pass. Turn onto the bullet-speed lead with this
+  burst&#x27;s aim error, thrust when roughly lined up, fire bursts, and run
+  until the phase timer ends (SUCCESS hands over to breakingOff). With no
+  target it lets go of every key and fails.
+
+  Ported key for key from the StrafeRun lambda in Behaviors.kt, which a
+  test (StrafeRunTreeTest) uses as the reference.
+--&gt;
+&lt;root BTCPP_format=&quot;4&quot; main_tree_to_execute=&quot;StrafeRun&quot;&gt;
+  &lt;BehaviorTree ID=&quot;StrafeRun&quot;&gt;
+    &lt;ReactiveFallback&gt;
+      &lt;ReactiveSequence name=&quot;pass&quot;&gt;
+        &lt;HasTarget/&gt;
+        &lt;AimAndFire bearing=&quot;{aimBearing}&quot;/&gt;
+        &lt;ThrustWithin bearing=&quot;{aimBearing}&quot;/&gt;
+        &lt;KeysOff keys=&quot;stabilize,afterburner,booster&quot;/&gt;
+        &lt;CountDownPhase/&gt;
+      &lt;/ReactiveSequence&gt;
+      &lt;ForceFailure name=&quot;noTarget&quot;&gt;
+        &lt;ReleaseAllKeys/&gt;
+      &lt;/ForceFailure&gt;
+    &lt;/ReactiveFallback&gt;
+  &lt;/BehaviorTree&gt;
+&lt;/root&gt;</code></pre>
+      </details>
+      <details class="json">
+        <summary><code>palette.xml</code>, every node the game has, with its ports · <a href="ai-diagrams/palette.xml" download>download</a></summary>
+        <pre><code>&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;
+&lt;!--
+  Generated from NodeRegistry (ai/bt/Leaves.kt) by ./gradlew btPalette. Don&#x27;t edit it here.
+  Load it into Groot2 to get the game&#x27;s nodes.
+
+  Blackboard keys, for ports written as {key}:
+    aimBearing (double, read-write): Bearing to the current aim point (radians)
+    heading (double, read-write): World heading a tree is flying (radians), from a heading leaf
+    turnBearing (double, read-write): Bearing still to turn onto the heading (radians), from TurnToBearing
+--&gt;
+&lt;root BTCPP_format=&quot;4&quot;&gt;
+  &lt;TreeNodesModel&gt;
+    &lt;Action ID=&quot;AimAndFire&quot;&gt;
+      &lt;output_port name=&quot;bearing&quot; type=&quot;double&quot;&gt;Bearing to the aim point (radians)&lt;/output_port&gt;
+    &lt;/Action&gt;
+    &lt;Action ID=&quot;AvoidObstacle&quot;/&gt;
+    &lt;Action ID=&quot;Breakaway&quot;/&gt;
+    &lt;Action ID=&quot;CountDownPhase&quot;/&gt;
+    &lt;Action ID=&quot;EngineKill&quot;&gt;
+      &lt;input_port name=&quot;seconds&quot; type=&quot;double&quot;&gt;How long (seconds)&lt;/input_port&gt;
+    &lt;/Action&gt;
+    &lt;Action ID=&quot;FireBurst&quot;/&gt;
+    &lt;Condition ID=&quot;HasRadarContact&quot;/&gt;
+    &lt;Condition ID=&quot;HasTarget&quot;/&gt;
+    &lt;Condition ID=&quot;HasVisual&quot;/&gt;
+    &lt;Action ID=&quot;HeadingAwayFromTarget&quot;&gt;
+      &lt;output_port name=&quot;heading&quot; type=&quot;double&quot;&gt;World heading (radians)&lt;/output_port&gt;
+    &lt;/Action&gt;
+    &lt;Action ID=&quot;HeadingToTarget&quot;&gt;
+      &lt;output_port name=&quot;heading&quot; type=&quot;double&quot;&gt;World heading (radians)&lt;/output_port&gt;
+    &lt;/Action&gt;
+    &lt;Condition ID=&quot;InRange&quot;&gt;
+      &lt;input_port name=&quot;range&quot; type=&quot;double&quot;&gt;World units; defaults to ENEMY_FIRE_RANGE&lt;/input_port&gt;
+    &lt;/Condition&gt;
+    &lt;Action ID=&quot;KeysOff&quot;&gt;
+      &lt;input_port name=&quot;keys&quot; type=&quot;std::string&quot;&gt;Comma-separated: rotateCw,rotateCcw,thrust,fire,stabilize,afterburner,booster,reverse&lt;/input_port&gt;
+    &lt;/Action&gt;
+    &lt;Action ID=&quot;OrderHeading&quot;&gt;
+      &lt;output_port name=&quot;heading&quot; type=&quot;double&quot;&gt;World heading (radians)&lt;/output_port&gt;
+    &lt;/Action&gt;
+    &lt;Action ID=&quot;Pivot&quot;&gt;
+      &lt;input_port name=&quot;degrees&quot; type=&quot;double&quot;&gt;How far to swing (degrees)&lt;/input_port&gt;
+      &lt;input_port name=&quot;seconds&quot; type=&quot;double&quot;&gt;Most time to take (seconds)&lt;/input_port&gt;
+    &lt;/Action&gt;
+    &lt;Action ID=&quot;ReleaseAllKeys&quot;/&gt;
+    &lt;Action ID=&quot;Reverse&quot;&gt;
+      &lt;input_port name=&quot;heading&quot; type=&quot;double&quot;&gt;World heading it&#x27;s about to fly (radians)&lt;/input_port&gt;
+    &lt;/Action&gt;
+    &lt;Action ID=&quot;Thrust&quot;&gt;
+      &lt;input_port name=&quot;afterburner&quot; type=&quot;bool&quot;&gt;Light the afterburner too&lt;/input_port&gt;
+      &lt;input_port name=&quot;booster&quot; type=&quot;bool&quot;&gt;Use the booster too&lt;/input_port&gt;
+      &lt;input_port name=&quot;seconds&quot; type=&quot;double&quot;&gt;Burn this long (seconds); 0, the default, is just this tick&lt;/input_port&gt;
+    &lt;/Action&gt;
+    &lt;Action ID=&quot;ThrustWithin&quot;&gt;
+      &lt;input_port name=&quot;bearing&quot; type=&quot;double&quot;&gt;Bearing to line up on (radians)&lt;/input_port&gt;
+      &lt;input_port name=&quot;cone&quot; type=&quot;double&quot;&gt;Half-angle of the cone (radians); defaults to AI_THRUST_CONE&lt;/input_port&gt;
+    &lt;/Action&gt;
+    &lt;Action ID=&quot;TurnAndBurn&quot;/&gt;
+    &lt;Action ID=&quot;TurnToBearing&quot;&gt;
+      &lt;input_port name=&quot;heading&quot; type=&quot;double&quot;&gt;World heading to turn onto (radians)&lt;/input_port&gt;
+      &lt;input_port name=&quot;tolerance&quot; type=&quot;double&quot;&gt;Close enough (radians); defaults to AI_THRUST_CONE&lt;/input_port&gt;
+      &lt;output_port name=&quot;bearing&quot; type=&quot;double&quot;&gt;Bearing still to turn (radians)&lt;/output_port&gt;
+    &lt;/Action&gt;
+  &lt;/TreeNodesModel&gt;
+&lt;/root&gt;</code></pre>
+      </details>
     </section>
 
     <section id="files">
