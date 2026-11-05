@@ -37,6 +37,7 @@
       <a href="#pro">What GitHub Pro changes</a>
       <a href="#template">How the template works</a>
       <a href="#tested">What I tested</a>
+      <a href="#non-html">Why only pages get encrypted</a>
       <a href="#gaps">Where the template falls short</a>
       <a href="#security">What a password page protects</a>
       <a href="#options">Options</a>
@@ -56,10 +57,10 @@
         <li><strong>GitHub Pro</strong> lets a private repo publish a Pages site, but GitHub's docs say the site itself stays public. Only Enterprise Cloud organizations can limit who views a Pages site.</li>
         <li><strong>The template</strong> encrypts one page with <a href="https://github.com/robinmoisson/staticrypt">StatiCrypt</a>. Visitors type a password, and the page is decrypted in their browser.</li>
         <li><strong>StatiCrypt itself</strong> can encrypt every HTML page of a site in one run, and its "remember me" option carries across pages. I tested this on a copy of the wiki, and it worked.</li>
-        <li><strong>Gap 1, other files:</strong> anything that isn't HTML (the JSON, SVG, XML and text downloads, the stylesheet) is published unencrypted. Anyone who knows or guesses its address can read it.</li>
+        <li><strong>Gap 1, other files:</strong> anything that isn't HTML (the JSON, SVG, XML and text downloads, the stylesheet) is published unencrypted. Anyone who knows or guesses its address can read it. <em>Decided: the wiki won't publish separate files, so this gap goes away (<a href="#non-html">below</a>).</em></li>
         <li><strong>Gap 2, history:</strong> what was public before stays out there. Making the repo private stops new access, but it can't recall copies people already made.</li>
       </ul>
-      <p><strong>My suggestion:</strong> use Pro and a private repo, and run StatiCrypt directly in a small workflow that encrypts every page on each publish. Move the downloads inside the pages, or drop them. The template's own workflow is the wrong shape for a multi-page wiki. The details are below.</p>
+      <p><strong>My suggestion:</strong> use Pro and a private repo, and run StatiCrypt directly in a small workflow that encrypts every page on each publish. Keep all content inside the pages, with no separate files, as decided. The template's own workflow is the wrong shape for a multi-page wiki. The details are below.</p>
     </section>
 
     <section id="pro">
@@ -111,6 +112,26 @@
         </tbody>
       </table></div>
       <p>The default login screen is a plain green box with the page title, a password field and "Remember me". It can be restyled to match the wiki's theme with a custom template, as the template repo does.</p>
+    </section>
+
+    <section id="non-html">
+      <h2>Why only pages get encrypted, and what we'll do about it</h2>
+      <div class="verdict">
+        <p><strong>Decided (5 Nov): no separate files.</strong> The wiki is for reading, mostly on a phone, so it doesn't need downloadable JSON, SVG, XML or text. Everything will live inside the HTML pages, where StatiCrypt encrypts it.</p>
+      </div>
+      <p><strong>Why StatiCrypt only encrypts HTML.</strong> GitHub Pages is a plain file server: it hands any file to anyone who asks for its URL, with no chance to ask for a password first. StatiCrypt gets around that by turning each page into a small HTML page that holds the encrypted content, a login form and a decryption script. Only an HTML page can carry its own login screen.</p>
+      <p>A request for <code>hsm.json</code> or an image gets the raw file, and no script runs. Encrypting those would only make them unreadable, so StatiCrypt copies them as they are. This applies to any password protection that works in the browser on static hosting, not just StatiCrypt. Gating every file needs a server in front (option D below).</p>
+      <p><strong>What that means for this wiki:</strong></p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Today</th><th>After the change</th></tr></thead>
+        <tbody>
+          <tr><td>The AI page shows the state machine with <code>&lt;img src="ai-diagrams/hsm.svg"&gt;</code>, a separate public file</td><td>The SVG is written into the page itself, so it's encrypted with it</td></tr>
+          <tr><td><code>hsm.json</code>, <code>enemy-pilot-spec.json</code>, <code>hsm.mmd</code>, <code>palette.xml</code>, the tree XML files and <code>behavior-trees.txt</code> under <code>ai-diagrams/</code>, linked as downloads</td><td>Deleted, with their download links. Their contents are already shown on the page (JSON panels, outlines, text trees).</td></tr>
+          <tr><td><code>style.css</code>, the shared theme</td><td>Can stay a separate file: it's only colors and fonts. It could be inlined too, if even that should be hidden.</td></tr>
+          <tr><td>Fonts from Google Fonts</td><td>No change: they're public fonts and reveal nothing</td></tr>
+        </tbody>
+      </table></div>
+      <p>One thing stays visible whatever we do: each page's address and file name, for example <code>ai-diagrams.html</code>. If even the names should give nothing away, pages can be given neutral names.</p>
     </section>
 
     <section id="gaps">
@@ -167,7 +188,7 @@
             <li>The salt lives in a committed <code>.staticrypt.json</code>, so "remember me" survives each publish.</li>
           </ul>
         </li>
-        <li><strong>Remove the separate download files</strong> (the JSON, SVG, XML and text under <code>ai-diagrams/</code>), since their contents are already in the page. Or add a "download" button that builds the file in the browser after login.</li>
+        <li><strong>Make every page self-contained</strong> (decided): put the state-machine SVG inside the AI page, then delete the <code>ai-diagrams/</code> folder and its download links. Add a check to the workflow that fails the publish if anything other than HTML and <code>style.css</code> would go out.</li>
         <li><strong>Upgrade to Pro</strong> and make <code>jets-wiki</code> private. Check that the site still publishes.</li>
         <li><strong>Add the password</strong> as a repo secret. Switch the Pages source from "Deploy from a branch" to "GitHub Actions" so the workflow takes over. Push, and test every page from a private browser window.</li>
         <li><strong>Decide about the old history:</strong> leave it (private from now on), or rewrite it. Rewriting history only helps if nobody copied it while it was public.</li>
@@ -181,7 +202,7 @@
       <ul class="checks">
         <li><span class="box">☐</span> Who should be able to read the wiki: just you, or a few people you'd give the password to? If it's several people with separate access, option D fits better.</li>
         <li><span class="box">☐</span> Is one shared password fine? How long should "remember me" last (for example 30 days, or never)?</li>
-        <li><span class="box">☐</span> Should the AI page keep separate downloadable files (built in the browser after login), or is the content on the page enough?</li>
+        <li><span class="box">☑</span> Should the AI page keep separate downloadable files? <em>Decided: no. The wiki is for reading, and everything stays inside the pages.</em></li>
         <li><span class="box">☐</span> Should the login page match the Halloween theme?</li>
         <li><span class="box">☐</span> What should happen with the public history: leave it, or rewrite it?</li>
         <li><span class="box">☐</span> Should this page stay on the wiki once the plan is done, or come off?</li>
